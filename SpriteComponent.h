@@ -7,8 +7,8 @@
 
 class SpriteComponent : public Component {
 public:
-    int frameWidth = 64;
-    int frameHeight = 64;
+    int frameWidth = 32;
+    int frameHeight = 32;
     bool flipped = false;
 
     SpriteComponent(const std::string& textureFile, TransformComponent* transform)
