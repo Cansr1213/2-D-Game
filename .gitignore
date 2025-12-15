@@ -1,0 +1,16 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.vcxproj.user
+
+# Build folders
+Debug/
+Release/
+x64/
+Win32/
+
+# Binaries
+*.exe
+*.dll
+*.pdb
