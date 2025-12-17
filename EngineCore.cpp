@@ -13,7 +13,7 @@
 
 EngineCore::EngineCore()
     : window("My 2D Game Engine", 800, 600),
-    tilemap(1, 1)
+    tilemap()
 {
     camera = window.getRenderWindow().getDefaultView();
 
@@ -32,7 +32,7 @@ EngineCore::EngineCore()
 
     player->addComponent<MovementComponent>(transform, &tilemap);
     player->addComponent<PhysicsComponent>(transform, &tilemap);
-    player->addComponent<AnimationComponent>(sprite, 64, 64, 6, 0.12f);
+    player->addComponent<AnimationComponent>(sprite, 47, 48, 6, 0.12f);
 }
 
 

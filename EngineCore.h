@@ -18,7 +18,7 @@ public:
 private:
     Window window;   // Our new window system!
     Scene scene;  // The scene managing entities
-    sf::View camers; // Main camera view
+ 
 
 
 

@@ -71,6 +71,7 @@ public:
         if (dx < 0.f) {
             // Moving left
             if (tilemap->isSolid(tileXLeft, tileY)) {
+                transform->position.x = (tileXLeft + 1) * tilemap->tileSize;
             }
             else {
                 transform->position.x = newX;
