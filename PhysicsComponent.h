@@ -19,7 +19,7 @@ public:
     }
 
     void update(float dt) override {
-        if (!transform) return;
+        if (!transform || !tilemap) return;
 
         // Jump
         if (onGround && sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
