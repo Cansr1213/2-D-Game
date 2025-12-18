@@ -32,7 +32,7 @@ EngineCore::EngineCore()
 
     player->addComponent<MovementComponent>(transform, &tilemap);
     player->addComponent<PhysicsComponent>(transform, &tilemap);
-    player->addComponent<AnimationComponent>(sprite, 47, 48, 6, 0.12f);
+    player->addComponent<AnimationComponent>(sprite, 47, 0, 6, 0.12f);
 }
 
 
