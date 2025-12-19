@@ -8,6 +8,10 @@ class EngineCore {
 public:
     EngineCore();
     Tilemap tilemap;
+    Entity* player = nullptr;
+    sf::Vector2f playerSpawn{ 100.f, 100.f };
+    int collectedCoins = 0;
+    bool levelComplete = false;
     void run();
 
     Entity* CreateEntity() {
@@ -27,4 +31,9 @@ private:
     void processEvents();
     void update(float dt);
     void render();
+
+    void clampCameraToLevel();
+    void resetPlayerIfFallen();
+    void handleCollectibles();
+    void checkGoalReached();
 };
