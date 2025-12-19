@@ -13,9 +13,14 @@ public:
     float gravity = 900.f;
     float jumpStrength = -400.f;
     bool onGround = false;
+    float colliderWidth = 32.f;
+    float colliderHeight = 47.f;
 
-    PhysicsComponent(TransformComponent* transform, Tilemap* tilemap)
-        : transform(transform), tilemap(tilemap) {
+
+    PhysicsComponent(TransformComponent* transform, Tilemap* tilemap,
+        float colliderWidth = 32.f, float colliderHeight = 48.f)
+        : transform(transform), tilemap(tilemap), colliderWidth(colliderWidth), colliderHeight(colliderHeight) {
+
     }
 
     void update(float dt) override {
@@ -29,24 +34,56 @@ public:
 
         // Apply gravity
         velocityY += gravity * dt;
+        
+        const float newY = transform->position.y + velocityY * dt;
 
-        // Predict new vertical position
-        float newY = transform->position.y + velocityY * dt;
+        const int tileXLeft = static_cast<int>(transform->position.x) / tilemap->tileSize;
+        const int tileXRight = static_cast<int>(transform->position.x + colliderWidth - 1.f) / tilemap->tileSize;
+        if (velocityY >= 0.f) {
 
-        // Convert new position to tile coords
-        int tileX = transform->position.x / tilemap->tileSize;
-        int tileY = newY / tilemap->tileSize;
+            const float feetY = newY + colliderHeight - 1.f;
+            const int tileY = static_cast<int>(feetY) / tilemap->tileSize;
 
-        // COLLISION: check if the tile below is solid
-        if (tilemap->isSolid(tileX, tileY)) {
-            // Snap player on top of tile
-            transform->position.y = tileY * tilemap->tileSize;
-            velocityY = 0.f;
-            onGround = true;
+            bool collided = false;
+            for (int x = tileXLeft; x <= tileXRight; ++x) {
+                if (tilemap->isSolid(x, tileY)) {
+                    transform->position.y = tileY * tilemap->tileSize - colliderHeight;
+                    velocityY = 0.f;
+                    onGround = true;
+                    collided = true;
+                    break;
+
+                }
+            }
+            if (!collided) {
+                transform->position.y = newY;
+                onGround = false;
+
+            }
+
+
+        
         }
         else {
-            transform->position.y = newY;
+            const float headY = newY;
+            const int tileY = static_cast<int>(headY) / tilemap->tileSize;
+
+            bool collided = false;
+            for (int x = tileXLeft; x <= tileXRight; ++x) {
+                if (tilemap->isSolid(x, tileY)) {
+                    transform->position.y = (tileY + 1) * tilemap->tileSize;
+                    velocityY = 0.f;
+                    collided = true;
+                    break;
+
+                }
+            }
+            if (!collided) {
+                transform->position.y = newY;
+
+            }
             onGround = false;
+            
         }
     }
 };
