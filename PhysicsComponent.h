@@ -11,7 +11,7 @@ public:
 
     float velocityY = 0.f;
     float gravity = 900.f;
-    float jumpStrength = -400.f;
+    float jumpStrength = -500.f;
     bool onGround = false;
     float colliderWidth = 32.f;
     float colliderHeight = 48.f;

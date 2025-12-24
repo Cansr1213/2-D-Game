@@ -20,6 +20,25 @@ EngineCore::EngineCore()
 {
     camera = window.getRenderWindow().getDefaultView();
 
+    if (!uiFont.loadFromFile("Assets/DejaVuSans.ttf")) {
+        std::cerr << "Failed to load UI font Assets/DejaVuSans.tff\n";
+
+    }
+    coinText.setFont(uiFont);
+    coinText.setCharacterSize(20);
+    coinText.setFillColor(sf::Color::White);
+    coinText.setPosition(16.f, 12.f);
+
+    pauseText.setFont(uiFont);
+    pauseText.setCharacterSize(20);
+    pauseText.setFillColor(sf::Color::Yellow);
+    pauseText.setPosition(16.f, 40.f);
+
+    goalText.setFont(uiFont);
+    goalText.setCharacterSize(28);
+    goalText.setFillColor(sf::Color::Green);
+   
+
     // ✅ TILEMAP MUST USE TILE TEXTURE (NOT PLAYER)
     tilemap.loadTileset("Assets/platform.png", 32, 32);
     tilemap.loadFromFile("Assets/level1.txt");
@@ -107,6 +126,13 @@ void EngineCore::update(float dt) {
     handleCollectibles();
     checkGoalReached();
     scene.update(dt);
+    if (levelComplete) {
+        goalMessageTimer -= dt;
+        if (goalMessageTimer <= 0.f) {
+            resetLevelState();
+
+        }
+    }
 
 
 
@@ -126,6 +152,21 @@ void EngineCore::render() {
 
     // Rest view
     window.getRenderWindow().setView(window.getRenderWindow().getDefaultView());
+
+    coinText.setString("Coins: " + std::to_string(collectedCoins) + " / " + std::to_string((tilemap.getCollectibleCount())));
+    pauseText.setString(paused ? "Paused" : "");
+
+    if (goalMessageTimer > 0.f) {
+        goalText.setString("Goal reached!");
+        const sf::FloatRect bounds = goalText.getLocalBounds();
+        const sf::Vector2u  windowSize = window.getRenderWindow().getSize();
+        goalText.setOrigin(bounds.left + bounds.width / 2.f, bounds.top + bounds.height / 2.f);
+        goalText.setPosition(static_cast<float>(windowSize.x) / 2.f, 100.f);
+        window.getRenderWindow().draw(goalText);
+
+    }
+    window.getRenderWindow().draw(coinText);
+    window.getRenderWindow().draw(pauseText);
 
 
     window.endDraw();
@@ -217,14 +258,16 @@ void EngineCore::checkGoalReached() {
 
     if (tilemap.reachedGoal(bounds)) {
         levelComplete = true;
+        goalMessageTimer = goalMessageDuration;
         std::cout << "Goal reached! Coins collected: " << collectedCoins << " / "
             << tilemap.getCollectibleCount() << "\n";
 
-        resetLevelState();
+        
     }
 }
 void EngineCore::resetLevelState() {
     levelComplete = false;
+    goalMessageTimer = 0.f;
     collectedCoins = 0;
     tilemap.resetCollectibles();
     if (!player)

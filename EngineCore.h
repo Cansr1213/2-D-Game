@@ -13,7 +13,7 @@ public:
     int collectedCoins = 0;
     bool levelComplete = false;
     bool resetHeld = false;
-    bool pauseHeld = false;
+    bool pausedHeld = false;
     bool paused = false;
     void run();
 
@@ -26,6 +26,12 @@ private:
     Window window;   // Our new window system!
     Scene scene;  // The scene managing entities
  
+    sf::Font uiFont;
+    sf::Text coinText;
+    sf::Text pauseText;
+    sf::Text goalText;
+    float goalMessageTimer = 0.f;
+    const float goalMessageDuration = 2.5f;
 
 
 
