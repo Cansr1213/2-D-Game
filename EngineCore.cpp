@@ -11,6 +11,7 @@
 #include <iostream>
 #include <filesystem>   // REQUIRED for current_path()
 #include <algorithm>
+#include <SFML/Graphics.hpp>
 
 
 EngineCore::EngineCore()
@@ -55,7 +56,24 @@ void EngineCore::run() {
 }
 
 void EngineCore::processEvents() {
-    window.processEvents();
+    sf::Event event;
+    while (window.pollEvent(event)) {
+        if (event.type == sf::Event::Closed) {
+            window.close();
+
+        }
+        if (event.type == sf::Event::KeyPressed) {
+            if (event.key.code == sf::Keyboard::Escape) {
+                window.close();
+
+            }
+            if (event.key.code == sf::Keyboard::P) {
+                paused = !paused;
+                std::cout << (!paused ? "Game paused\n" : "Game resume\n");
+            }
+        }
+    }
+
 }
 
 void EngineCore::update(float dt) {
@@ -68,6 +86,21 @@ void EngineCore::update(float dt) {
     
 
     }
+    
+    
+    
+    const bool resetPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::R);
+    if (resetPressed && !resetHeld) {
+        resetLevelState();
+        
+    }
+    resetHeld = resetPressed;
+
+    if (paused) {
+        return;
+
+    }
+
 
     resetPlayerIfFallen();
     clampCameraToLevel();
@@ -187,13 +220,26 @@ void EngineCore::checkGoalReached() {
         std::cout << "Goal reached! Coins collected: " << collectedCoins << " / "
             << tilemap.getCollectibleCount() << "\n";
 
-        transform->position = playerSpawn;
-
-        if (PhysicsComponent* physics = player->getComponent<PhysicsComponent>()) {
-            physics->velocityY = 0.f;
-            physics->onGround = false;
-        }
-
-        camera.setCenter(playerSpawn);
+        resetLevelState();
     }
 }
+void EngineCore::resetLevelState() {
+    levelComplete = false;
+    collectedCoins = 0;
+    tilemap.resetCollectibles();
+    if (!player)
+        return;
+    if (TransformComponent* transform = player->getComponent<TransformComponent>()) {
+        transform->position = playerSpawn;
+
+    }
+    if (PhysicsComponent* physics = player->getComponent<PhysicsComponent>()) {
+        physics->velocityY = 0.f;
+        physics->onGround = false;
+
+    }
+    camera.setCenter(playerSpawn);
+}
+
+
+        

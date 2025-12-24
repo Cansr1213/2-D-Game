@@ -2,7 +2,7 @@
 #include "Window.h"
 #include "Scene.h"
 #include "Tilemap.h"
-
+#include <SFML/Graphics.hpp>
 
 class EngineCore {
 public:
@@ -12,6 +12,9 @@ public:
     sf::Vector2f playerSpawn{ 100.f, 100.f };
     int collectedCoins = 0;
     bool levelComplete = false;
+    bool resetHeld = false;
+    bool pauseHeld = false;
+    bool paused = false;
     void run();
 
     Entity* CreateEntity() {
@@ -36,4 +39,6 @@ private:
     void resetPlayerIfFallen();
     void handleCollectibles();
     void checkGoalReached();
+    void resetLevelState();
+
 };

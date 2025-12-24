@@ -14,7 +14,7 @@ public:
     float jumpStrength = -400.f;
     bool onGround = false;
     float colliderWidth = 32.f;
-    float colliderHeight = 47.f;
+    float colliderHeight = 48.f;
 
 
     PhysicsComponent(TransformComponent* transform, Tilemap* tilemap,

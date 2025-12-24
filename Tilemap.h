@@ -201,6 +201,10 @@ public:
     int getCollectibleCount() const {
         return static_cast<int>(collectibles.size());
     }
+    void resetCollectibles() {
+        collectibleCollected.assign(collectibleCollected.size(), false);
+
+    }
 
     int getCollectedCount() const {
         int count = 0;

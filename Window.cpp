@@ -1,5 +1,6 @@
 #include "Window.h"
 
+
 Window::Window(const std::string& title, int width, int  height) : window(sf::VideoMode(width, height), title) {
 	window.setFramerateLimit(60);
 }
@@ -21,6 +22,15 @@ void Window::processEvents() {
 		
 		if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape)window.close();
 	}
+}
+bool Window::pollEvent(sf::Event& event) {
+	return window.pollEvent(event);
+
+}
+void Window::close() {
+	window.close();
+
+
 }
 bool Window::isOpen() {
 	return window.isOpen();

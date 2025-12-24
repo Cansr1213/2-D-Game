@@ -7,6 +7,8 @@ public:
 	void beginDraw();
 	void endDraw();
 	void processEvents();
+	bool pollEvent(sf::Event& event);
+	void close();
 	bool isOpen();
 	sf::RenderWindow& getRenderWindow();
 
