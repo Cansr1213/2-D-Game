@@ -6,12 +6,31 @@
 #include "SpriteComponent.h"
 #include "MovementComponent.h"
 #include "PhysicsComponent.h"
+#include "EnemyComponent.h"
 #include "Tilemap.h"
 #include "AnimationComponent.h"
 #include <iostream>
 #include <filesystem>   // REQUIRED for current_path()
 #include <algorithm>
+#include <cmath>
 #include <SFML/Graphics.hpp>
+
+namespace {
+    std::filesystem::path findAssetsRoot() {
+        std::filesystem::path current = std::filesystem::current_path();
+        for (int depth = 0; depth < 5; ++depth) {
+            std::filesystem::path candidate = current / "Assets";
+            if (std::filesystem::exists(candidate) && std::filesystem::is_directory(candidate)) {
+                return candidate;
+            }
+            if (!current.has_parent_path()) {
+                break;
+            }
+            current = current.parent_path();
+        }
+        return {};
+    }
+}
 
 
 EngineCore::EngineCore()
@@ -37,6 +56,12 @@ EngineCore::EngineCore()
     goalText.setFont(uiFont);
     goalText.setCharacterSize(28);
     goalText.setFillColor(sf::Color::Green);
+
+    controlsText.setFont(uiFont);
+    controlsText.setCharacterSize(16);
+    controlsText.setFillColor(sf::Color(220, 220, 220));
+    controlsText.setPosition(16.f, 500.f);
+
    
 
     // ✅ TILEMAP MUST USE TILE TEXTURE (NOT PLAYER)
@@ -59,6 +84,21 @@ EngineCore::EngineCore()
     player->addComponent<MovementComponent>(transform, &tilemap);
     player->addComponent<PhysicsComponent>(transform, &tilemap);
     player->addComponent<AnimationComponent>(sprite, 47, 0, 6, 0.12f);
+
+    Entity* goomba = scene.createEntity();
+    TransformComponent* goombaTransform =
+        goomba->addComponent<TransformComponent>(playerSpawn.x + 200.f, playerSpawn.y);
+    SpriteComponent* goombaSprite =
+        goomba->addComponent<SpriteComponent>("Assets/nathaniel.png", goombaTransform);
+        goombaSprite->getSprite().setTextureRect(sf::IntRect(0, 0, 32, 32));
+        goomba->addComponent<PhysicsComponent>(goombaTransform, &tilemap, 32.f, 32.f, false);
+        goomba->addComponent<EnemyComponent>(goombaTransform, &tilemap, 32.f, 32.f);
+        goomba->addComponent<AnimationComponent>(goombaSprite, 47, 0, 6, 0.12f);
+
+
+
+
+
 }
 
 
@@ -126,6 +166,7 @@ void EngineCore::update(float dt) {
     handleCollectibles();
     checkGoalReached();
     scene.update(dt);
+    handleEnemyCollisions();
     if (levelComplete) {
         goalMessageTimer -= dt;
         if (goalMessageTimer <= 0.f) {
@@ -167,6 +208,8 @@ void EngineCore::render() {
     }
     window.getRenderWindow().draw(coinText);
     window.getRenderWindow().draw(pauseText);
+    controlsText.setString("Move: A/D Jump: Space Reset: R Pause: P");
+    window.getRenderWindow().draw(controlsText);
 
 
     window.endDraw();
@@ -193,6 +236,10 @@ void EngineCore::clampCameraToLevel() {
 
     center.x = std::clamp(center.x, minX, std::max(minX, maxX));
     center.y = std::clamp(center.y, minY, std::max(minY, maxY));
+    
+    center.x = std::round(center.x);
+    center.y = std::round(center.y);
+
 
     camera.setCenter(center);
 }
@@ -210,14 +257,10 @@ void EngineCore::resetPlayerIfFallen() {
     const float fallThreshold = static_cast<float>(tilemap.getPixelHeight()) + 200.f;
 
     if (transform->position.y > fallThreshold) {
-        transform->position = playerSpawn;
+        
 
-        if (physics) {
-            physics->velocityY = 0.f;
-            physics->onGround = false;
-        }
+        respawnPlayer();
 
-        camera.setCenter(playerSpawn);
     }
 }
 
@@ -265,13 +308,10 @@ void EngineCore::checkGoalReached() {
         
     }
 }
-void EngineCore::resetLevelState() {
-    levelComplete = false;
-    goalMessageTimer = 0.f;
-    collectedCoins = 0;
-    tilemap.resetCollectibles();
+void EngineCore::respawnPlayer() {
     if (!player)
         return;
+
     if (TransformComponent* transform = player->getComponent<TransformComponent>()) {
         transform->position = playerSpawn;
 
@@ -282,7 +322,80 @@ void EngineCore::resetLevelState() {
 
     }
     camera.setCenter(playerSpawn);
+
 }
 
+void EngineCore::handleEnemyCollisions() {
+    if (!player)
+        return;
+
+    TransformComponent* playerTransform = player->getComponent<TransformComponent>();
+    PhysicsComponent* playerPhysics = player->getComponent<PhysicsComponent>();
+    MovementComponent* playerMovement = player->getComponent<MovementComponent>();
+
+    if (!playerTransform || !playerPhysics)
+        return;
+
+    const float playerWidth = playerMovement ? playerMovement->colliderWidth : 32.f;
+    const float playerHeight = playerMovement ? playerMovement->colliderHeight : 48.f;
+    const sf::FloatRect playerBounds(
+        playerTransform->position.x,
+        playerTransform->position.y,
+        playerWidth,
+        playerHeight);
+
+    for (auto& entity : scene.getEntities()) {
+        EnemyComponent* enemy = entity->getComponent<EnemyComponent>();
+        if (!enemy || !enemy->alive)
+            continue;
+
+        TransformComponent* enemyTransform = entity->getComponent<TransformComponent>();
+        if (!enemyTransform)
+            continue;
+
+        const sf::FloatRect enemyBounds(
+            enemyTransform->position.x,
+            enemyTransform->position.y,
+            enemy->colliderWidth,
+            enemy->colliderHeight);
+
+        if (!playerBounds.intersects(enemyBounds))
+            continue;
+
+        const float playerBottom = playerBounds.top + playerBounds.height;
+        const float enemyTop = enemyBounds.top;
+        const bool stomp = playerBottom <= enemyTop + 5.f && playerPhysics->velocityY > 0.f;
+
+        if (stomp) {
+            enemy->alive = false;
+            if (PhysicsComponent* enemyPhysics = entity->getComponent<PhysicsComponent>()) {
+                enemyPhysics->velocityY = 0.f;
+                enemyPhysics->onGround = true;
+
+
+            }
+            if (SpriteComponent* sprite = entity->getComponent<SpriteComponent>()) {
+                sprite->setVisible(false);
+
+            }
+            playerPhysics->velocityY = -250.f;
+            playerPhysics->onGround = false;
+
+        }
+        else {
+            respawnPlayer();
+
+        }
+    }
+
+}
+void EngineCore::resetLevelState() {
+    levelComplete = false;
+    goalMessageTimer = 0.f;
+    collectedCoins = 0;
+    tilemap.resetCollectibles();
+    respawnPlayer();
+
+}
 
         

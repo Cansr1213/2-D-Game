@@ -6,7 +6,7 @@ Window::Window(const std::string& title, int width, int  height) : window(sf::Vi
 }
 
 void Window::beginDraw() {
-	window.clear(sf::Color::Black);
+	window.clear(sf::Color(120, 180, 225));
 
 }
 

@@ -13,13 +13,17 @@ public:
     float gravity = 900.f;
     float jumpStrength = -500.f;
     bool onGround = false;
+    bool allowJumpInput = true;
     float colliderWidth = 32.f;
     float colliderHeight = 48.f;
 
 
     PhysicsComponent(TransformComponent* transform, Tilemap* tilemap,
-        float colliderWidth = 32.f, float colliderHeight = 48.f)
-        : transform(transform), tilemap(tilemap), colliderWidth(colliderWidth), colliderHeight(colliderHeight) {
+        float colliderWidth = 32.f, float colliderHeight = 48.f, bool allowJumpInput = true)
+        : transform(transform), tilemap(tilemap), colliderWidth(colliderWidth), colliderHeight(colliderHeight), allowJumpInput(allowJumpInput)
+
+
+    {
 
     }
 
@@ -27,14 +31,14 @@ public:
         if (!transform || !tilemap) return;
 
         // Jump
-        if (onGround && sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
+        if (allowJumpInput && onGround && sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
             velocityY = jumpStrength;
             onGround = false;
         }
 
         // Apply gravity
         velocityY += gravity * dt;
-        
+
         const float newY = transform->position.y + velocityY * dt;
 
         const int tileXLeft = static_cast<int>(transform->position.x) / tilemap->tileSize;
@@ -62,7 +66,7 @@ public:
             }
 
 
-        
+
         }
         else {
             const float headY = newY;
@@ -83,7 +87,7 @@ public:
 
             }
             onGround = false;
-            
+
         }
     }
 };

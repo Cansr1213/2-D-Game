@@ -10,6 +10,8 @@ public:
     int frameWidth = 32;
     int frameHeight = 32;
     bool flipped = false;
+    bool visible = true;
+
 
     SpriteComponent(const std::string& textureFile, TransformComponent* transform)
         : transform(transform)
@@ -31,6 +33,7 @@ public:
     }
 
     void render(sf::RenderWindow& window) override {
+        if (!visible) return;
         window.draw(sprite);
     }
 
@@ -41,6 +44,9 @@ public:
         if (flipped == flip) return;
         flipped = flip;
         sprite.setScale(flip ? -1.f : 1.f, 1.f);
+    }
+    void setVisible(bool isVisible) {
+        visible = isVisible;
     }
 
 private:

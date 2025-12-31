@@ -145,6 +145,7 @@
   <ItemGroup>
     <ClInclude Include="AnimationComponent.h" />
     <ClInclude Include="Component.h" />
+    <ClInclude Include="EnemyComponent.h" />
     <ClInclude Include="EngineCore.h" />
     <ClInclude Include="Entity.h" />
     <ClInclude Include="Input.h" />

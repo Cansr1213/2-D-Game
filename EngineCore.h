@@ -30,6 +30,7 @@ private:
     sf::Text coinText;
     sf::Text pauseText;
     sf::Text goalText;
+    sf::Text controlsText;
     float goalMessageTimer = 0.f;
     const float goalMessageDuration = 2.5f;
 
@@ -42,9 +43,11 @@ private:
     void render();
 
     void clampCameraToLevel();
+    void respawnPlayer();
     void resetPlayerIfFallen();
     void handleCollectibles();
     void checkGoalReached();
+    void handleEnemyCollisions();
     void resetLevelState();
 
 };
