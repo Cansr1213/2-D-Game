@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include <algorithm>
 #include <SFML/Graphics.hpp>
 #include "Entity.h"
 
@@ -23,6 +24,12 @@ public:
 	void update(float dt) {
 		for (auto& e : entities)
 			e->update(dt);
+
+		entities.erase(
+			std::remove_if(entities.begin(), entities.end(),
+				[](const std::unique_ptr<Entity>& e) { return !e->isActive(); }),
+			entities.end());
+
 
 	}
 	void render(sf::RenderWindow& window) {

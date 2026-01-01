@@ -1,6 +1,7 @@
 #pragma once
 #include "Component.h"
 #include "TransformComponent.h"
+#include "Entity.h"
 #include "Tilemap.h"
 #include "SpriteComponent.h"
 #include "PhysicsComponent.h"
@@ -15,6 +16,8 @@ public:
     float speed = 60.f;
     int direction = -1;
     bool alive = true;
+    float deathTimer = 0.f;
+    float deathDelay = 0.3f;
     float colliderWidth = 32.f;
     float colliderHeight = 32.f;
 
@@ -25,7 +28,17 @@ public:
     }
 
     void update(float dt) override {
-        if (!transform || !tilemap || !alive) return;
+        if (!transform || !tilemap) return;
+        if (!alive) {
+            if (deathTimer > 0.f) {
+                deathTimer -= dt;
+                if (deathTimer <= 0.f) {
+                    entity->destroy();
+
+                }
+            }
+            return;
+        }
 
         float dx = direction * speed * dt;
         float newX = transform->position.x + dx;

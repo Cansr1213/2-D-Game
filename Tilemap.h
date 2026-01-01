@@ -13,6 +13,7 @@ public:
 
     std::vector<std::vector<int>> tiles;
     std::vector<sf::Vector2i> spawnTiles;
+    std::vector<sf::Vector2i> enemySpawnTiles;
     std::vector<sf::Vector2i> goalTiles;
     std::vector<sf::Vector2f> collectibles;
     std::vector<bool> collectibleCollected;
@@ -70,6 +71,7 @@ public:
         }
         tiles.assign(lines.size(), std::vector<int>(static_cast<int>(maxWidth), 0));
         spawnTiles.clear();
+        enemySpawnTiles.clear();
         goalTiles.clear();
         collectibles.clear();
         collectibleCollected.clear();
@@ -89,6 +91,10 @@ public:
                 case 'S':
                 case 's':
                     spawnTiles.push_back(sf::Vector2i(static_cast<int>(x), static_cast<int>(y)));
+                    break;
+                case 'E':
+                case 'e':
+                    enemySpawnTiles.push_back(sf::Vector2i(static_cast<int>(x), static_cast<int>(y)));
                     break;
                 case 'G':
                 case 'g':
@@ -196,6 +202,14 @@ public:
 
         const sf::Vector2i tile = spawnTiles.front();
         return sf::Vector2f(static_cast<float>(tile.x * tileSize), static_cast<float>(tile.y * tileSize));
+    }
+    std::vector<sf::Vector2f> getEnemySpawnPoints() const {
+        std::vector<sf::Vector2f> points;
+        points.reserve(enemySpawnTiles.size());
+        for (const auto& tile : enemySpawnTiles) {
+            points.emplace_back(static_cast<float>(tile.x * tileSize), static_cast<float>(tile.y * tileSize));
+            return points;
+        }
     }
 
     int getCollectibleCount() const {

@@ -85,15 +85,19 @@ EngineCore::EngineCore()
     player->addComponent<PhysicsComponent>(transform, &tilemap);
     player->addComponent<AnimationComponent>(sprite, 47, 0, 6, 0.12f);
 
-    Entity* goomba = scene.createEntity();
-    TransformComponent* goombaTransform =
-        goomba->addComponent<TransformComponent>(playerSpawn.x + 200.f, playerSpawn.y);
-    SpriteComponent* goombaSprite =
-        goomba->addComponent<SpriteComponent>("Assets/nathaniel.png", goombaTransform);
+    for (const auto& enemySpawn : tilemap.getEnemySpawnPoints()) {
+        Entity* goomba = scene.createEntity();
+        TransformComponent* goombaTransform =
+            goomba->addComponent<TransformComponent>(enemySpawn.x, enemySpawn.y);
+        SpriteComponent* goombaSprite =
+            goomba->addComponent<SpriteComponent>("Assets/nathaniel.png", goombaTransform);
+
         goombaSprite->getSprite().setTextureRect(sf::IntRect(0, 0, 32, 32));
         goomba->addComponent<PhysicsComponent>(goombaTransform, &tilemap, 32.f, 32.f, false);
         goomba->addComponent<EnemyComponent>(goombaTransform, &tilemap, 32.f, 32.f);
         goomba->addComponent<AnimationComponent>(goombaSprite, 47, 0, 6, 0.12f);
+    }
+
 
 
 
@@ -368,6 +372,7 @@ void EngineCore::handleEnemyCollisions() {
 
         if (stomp) {
             enemy->alive = false;
+            enemy->deathTimer = enemy->deathDelay;
             if (PhysicsComponent* enemyPhysics = entity->getComponent<PhysicsComponent>()) {
                 enemyPhysics->velocityY = 0.f;
                 enemyPhysics->onGround = true;
@@ -375,7 +380,8 @@ void EngineCore::handleEnemyCollisions() {
 
             }
             if (SpriteComponent* sprite = entity->getComponent<SpriteComponent>()) {
-                sprite->setVisible(false);
+                const float currentXScale = sprite->getSprite().getScale().x;
+                sprite->getSprite().setScale(currentXScale, 0.5f);
 
             }
             playerPhysics->velocityY = -250.f;

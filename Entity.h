@@ -6,13 +6,26 @@
 
 class Entity {
 public:
+	void destroy() {
+		active = false;
+
+	}
+	bool isActive() const {
+		return active;
+
+	}
 	void update(float dt) {
+		if (!active)
+			return;
+
 		for (auto& c : components)
 			c->update(dt);
 
 	}
 
 	void render(sf::RenderWindow& window) {
+		if (!active)
+			return;
 		for (auto& c : components)
 			c->render(window);
 
@@ -42,5 +55,7 @@ public:
 	}
 private:
 	std::vector<std::unique_ptr<Component>> components;
+	bool active = true;
+
 
 };
