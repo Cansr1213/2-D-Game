@@ -3,6 +3,7 @@
 #include "TransformComponent.h"
 #include "Tilemap.h"
 #include <SFML/Window/Keyboard.hpp>
+#include <algorithm>
 
 class PhysicsComponent : public Component {
 public:
@@ -14,6 +15,12 @@ public:
     float jumpStrength = -500.f;
     bool onGround = false;
     bool allowJumpInput = true;
+    float coyoteTime = 0.1f;
+    float jumpBufferTime = 0.1f;
+    float coyoteTimer = 0.f;
+    float jumbBufferTimer = 0.f;
+    float jumpCutMultiplier = 0.45f;
+    float jumpHeldLastFrame = false;
     float colliderWidth = 32.f;
     float colliderHeight = 48.f;
 
@@ -30,12 +37,32 @@ public:
     void update(float dt) override {
         if (!transform || !tilemap) return;
 
-        // Jump
-        if (allowJumpInput && onGround && sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
+        const bool jumpPressed = allowJumpInput && sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
+        if (jumpPressed && !jumpHeldLastFrame) {
+            jumbBufferTimer = jumpBufferTime;
+
+        
+        }
+        else if (jumbBufferTimer > 0.f) {
+            jumbBufferTimer = std::max(0.f, jumpBufferTime - dt);
+
+        }
+        if (onGround) {
+            coyoteTimer = coyoteTime;
+        }
+        else if (coyoteTimer > 0.f) {
+            coyoteTimer = std::max(0.f, coyoteTimer - dt);
+
+        }
+        if (jumbBufferTimer > 0.f && coyoteTimer > 0.f) {
             velocityY = jumpStrength;
             onGround = false;
+            jumbBufferTimer = 0.f;
+            coyoteTimer = 0.f;
         }
-
+        if (!jumpPressed && jumpHeldLastFrame && velocityY < 0.f) {
+            velocityY *= jumpCutMultiplier;
+        }
         // Apply gravity
         velocityY += gravity * dt;
 
@@ -89,5 +116,6 @@ public:
             onGround = false;
 
         }
+        jumpHeldLastFrame = jumpPressed;
     }
 };

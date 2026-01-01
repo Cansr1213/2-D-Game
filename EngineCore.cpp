@@ -212,7 +212,7 @@ void EngineCore::render() {
     }
     window.getRenderWindow().draw(coinText);
     window.getRenderWindow().draw(pauseText);
-    controlsText.setString("Move: A/D Jump: Space Reset: R Pause: P");
+    controlsText.setString("Move: A/D Jump: Space Run: Shift Reset: R Pause: P");
     window.getRenderWindow().draw(controlsText);
 
 

@@ -208,8 +208,10 @@ public:
         points.reserve(enemySpawnTiles.size());
         for (const auto& tile : enemySpawnTiles) {
             points.emplace_back(static_cast<float>(tile.x * tileSize), static_cast<float>(tile.y * tileSize));
-            return points;
+            
         }
+        return points;
+
     }
 
     int getCollectibleCount() const {
