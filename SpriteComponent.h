@@ -43,7 +43,10 @@ public:
     void setFlipped(bool flip) {
         if (flipped == flip) return;
         flipped = flip;
-        sprite.setScale(flip ? -1.f : 1.f, 1.f);
+        const sf::Vector2f currentScale = sprite.getScale();
+        const float xScale = std::abs(currentScale.x) > 0.f ? std::abs(currentScale.x) : 1.f;
+        const float yScale = currentScale.y == 0.f ? 1.f : currentScale.y;
+        sprite.setScale(flip ? -xScale : xScale, yScale);
     }
     void setVisible(bool isVisible) {
         visible = isVisible;

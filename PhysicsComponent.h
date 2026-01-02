@@ -18,9 +18,9 @@ public:
     float coyoteTime = 0.1f;
     float jumpBufferTime = 0.1f;
     float coyoteTimer = 0.f;
-    float jumbBufferTimer = 0.f;
+    float jumpBufferTimer = 0.f;
     float jumpCutMultiplier = 0.45f;
-    float jumpHeldLastFrame = false;
+    bool jumpHeldLastFrame = false;
     float colliderWidth = 32.f;
     float colliderHeight = 48.f;
 
@@ -39,12 +39,12 @@ public:
 
         const bool jumpPressed = allowJumpInput && sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
         if (jumpPressed && !jumpHeldLastFrame) {
-            jumbBufferTimer = jumpBufferTime;
+            jumpBufferTimer = jumpBufferTime;
 
         
         }
-        else if (jumbBufferTimer > 0.f) {
-            jumbBufferTimer = std::max(0.f, jumpBufferTime - dt);
+        else if (jumpBufferTimer > 0.f) {
+            jumpBufferTimer = std::max(0.f, jumpBufferTime - dt);
 
         }
         if (onGround) {
@@ -54,10 +54,10 @@ public:
             coyoteTimer = std::max(0.f, coyoteTimer - dt);
 
         }
-        if (jumbBufferTimer > 0.f && coyoteTimer > 0.f) {
+        if (jumpBufferTimer > 0.f && coyoteTimer > 0.f) {
             velocityY = jumpStrength;
             onGround = false;
-            jumbBufferTimer = 0.f;
+            jumpBufferTimer = 0.f;
             coyoteTimer = 0.f;
         }
         if (!jumpPressed && jumpHeldLastFrame && velocityY < 0.f) {
