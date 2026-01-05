@@ -48,6 +48,16 @@ EngineCore::EngineCore()
     coinText.setFillColor(sf::Color::White);
     coinText.setPosition(16.f, 12.f);
 
+    scoreText.setFont(uiFont);
+    scoreText.setCharacterSize(20);
+    scoreText.setFillColor(sf::Color::White);
+    scoreText.setPosition(200.f, 12.f);
+
+    livesText.setFont(uiFont);
+    livesText.setCharacterSize(32);
+    livesText.setFillColor(sf::Color::White);
+    livesText.setPosition(380.f, 12.f);
+
     pauseText.setFont(uiFont);
     pauseText.setCharacterSize(20);
     pauseText.setFillColor(sf::Color::Yellow);
@@ -56,6 +66,10 @@ EngineCore::EngineCore()
     goalText.setFont(uiFont);
     goalText.setCharacterSize(28);
     goalText.setFillColor(sf::Color::Green);
+    
+    gameOverText.setFont(uiFont);
+    gameOverText.setCharacterSize(32);
+    gameOverText.setFillColor(sf::Color::Red);
 
     controlsText.setFont(uiFont);
     controlsText.setCharacterSize(16);
@@ -72,7 +86,7 @@ EngineCore::EngineCore()
     }
 
 
-
+    
     // ✅ CREATE ONE PLAYER ENTITY
     player = scene.createEntity();
 
@@ -154,7 +168,14 @@ void EngineCore::update(float dt) {
     
     const bool resetPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::R);
     if (resetPressed && !resetHeld) {
-        resetLevelState();
+        if (gameOver) {
+            resetGameState();
+
+        }
+        else {
+            resetLevelState();
+
+        }
         
     }
     resetHeld = resetPressed;
@@ -163,8 +184,12 @@ void EngineCore::update(float dt) {
         return;
 
     }
+    if (gameOver) {
+        return;
 
+    }
 
+	updateInvincibility(dt);
     resetPlayerIfFallen();
     clampCameraToLevel();
     handleCollectibles();
@@ -199,6 +224,8 @@ void EngineCore::render() {
     window.getRenderWindow().setView(window.getRenderWindow().getDefaultView());
 
     coinText.setString("Coins: " + std::to_string(collectedCoins) + " / " + std::to_string((tilemap.getCollectibleCount())));
+    scoreText.setString("Score: " + std::to_string(score));
+    livesText.setString("Lives: " + std::to_string(lives));
     pauseText.setString(paused ? "Paused" : "");
 
     if (goalMessageTimer > 0.f) {
@@ -211,10 +238,19 @@ void EngineCore::render() {
 
     }
     window.getRenderWindow().draw(coinText);
+    window.getRenderWindow().draw(scoreText);
+    window.getRenderWindow().draw(livesText);
     window.getRenderWindow().draw(pauseText);
     controlsText.setString("Move: A/D Jump: Space Run: Shift Reset: R Pause: P");
     window.getRenderWindow().draw(controlsText);
 
+    if (gameOver) {
+        gameOverText.setString("Gameover - Press R to Restart");
+        const sf::FloatRect bounds = gameOverText.getLocalBounds();
+        const sf::Vector2u windowSize = window.getRenderWindow().getSize();
+        gameOverText.setPosition(static_cast<float>(windowSize.x) / 2.f, 140.f);
+        window.getRenderWindow().draw(gameOverText);
+    }
 
     window.endDraw();
 
@@ -263,7 +299,7 @@ void EngineCore::resetPlayerIfFallen() {
     if (transform->position.y > fallThreshold) {
         
 
-        respawnPlayer();
+        loseLife();
 
     }
 }
@@ -283,8 +319,11 @@ void EngineCore::handleCollectibles() {
 
     const sf::FloatRect bounds(transform->position.x, transform->position.y, width, height);
 
-    if (tilemap.collectIfOverlapping(bounds)) {
+    const int collectedNow = tilemap.collectIfOverlapping(bounds);
+    if (collectedNow < 0) {
+
         collectedCoins = tilemap.getCollectedCount();
+        score += collectedNow * coinScoreValue;
         std::cout << "Collected coin " << collectedCoins << " / " << tilemap.getCollectibleCount() << "\n";
     }
 }
@@ -306,6 +345,7 @@ void EngineCore::checkGoalReached() {
     if (tilemap.reachedGoal(bounds)) {
         levelComplete = true;
         goalMessageTimer = goalMessageDuration;
+        score += goalScoreValue;
         std::cout << "Goal reached! Coins collected: " << collectedCoins << " / "
             << tilemap.getCollectibleCount() << "\n";
 
@@ -326,6 +366,11 @@ void EngineCore::respawnPlayer() {
 
     }
     camera.setCenter(playerSpawn);
+    if (!invincible) {
+        if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+            sprite->getSprite().setColor(sf::Color(255, 255, 255, 255));
+        }
+    }
 
 }
 
@@ -389,7 +434,7 @@ void EngineCore::handleEnemyCollisions() {
 
         }
         else {
-            respawnPlayer();
+            loseLife();
 
         }
     }
@@ -399,9 +444,61 @@ void EngineCore::resetLevelState() {
     levelComplete = false;
     goalMessageTimer = 0.f;
     collectedCoins = 0;
+    invincible = false;
+    invincibilityTimer = 0.f;
     tilemap.resetCollectibles();
     respawnPlayer();
 
 }
+void EngineCore::updateInvincibility(float dt) {
+    if (!invincible)
+        return;
+    invincibilityTimer = std::max(0.f, invincibilityTimer - dt);
+    if (invincibilityTimer <= 0.f) {
+        invincible = false;
+        if (player) {
+            if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+                sprite->getSprite().setColor(sf::Color(255, 255, 255, 255));
+            }
+        }
+    }
+    else if (player) {
+        if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+            const float alpha = (static_cast<int>(invincibilityTimer * 10.f) % 2 == 0) ? 120.f : 255.f;
+            sprite->getSprite().setColor(sf::Color(255, 255, 255, static_cast<sf::Uint8>(alpha)));
+        }
+    }
+}
+void EngineCore::loseLife() {
+    if (invincible || gameOver)
+        return;
+    lives = std::max(0, lives - 1);
+    invincible = true;
+    invincibilityTimer = invincibilityDuration;
+
+    if (lives <= 0) {
+        gameOver = true;
+        invincible = false;
+        invincibilityTimer = 0.f;
+        if (player) {
+            if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+                sprite->getSprite().setColor(sf::Color(255, 255, 255, 255));
+
+            }
+        }
+        return;
+
+    }
+    respawnPlayer();
+}
+void EngineCore::resetGameState() {
+    score = 0;
+    lives = 3;
+    gameOver = false;
+    invincible = false;
+    invincibilityTimer = 0.f;
+    resetLevelState();
+}
+
 
         

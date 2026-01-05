@@ -230,18 +230,19 @@ public:
         return count;
     }
 
-    bool collectIfOverlapping(const sf::FloatRect& bounds) {
-        bool collectedAny = false;
+    int collectIfOverlapping(const sf::FloatRect& bounds) {
+        int collectedCount = 0;
         for (std::size_t i = 0; i < collectibles.size() && i < collectibleCollected.size(); ++i) {
             if (collectibleCollected[i])
                 continue;
 
             if (bounds.contains(collectibles[i])) {
                 collectibleCollected[i] = true;
-                collectedAny = true;
+                ++collectedCount;
+
             }
         }
-        return collectedAny;
+        return collectedCount;
     }
 
     bool reachedGoal(const sf::FloatRect& bounds) const {
