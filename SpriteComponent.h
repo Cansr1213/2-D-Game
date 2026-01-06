@@ -29,7 +29,9 @@ public:
 
     void update(float dt) override {
         // ✅ Keep physics + rendering aligned
-        sprite.setPosition(transform->position);
+        sprite.setPosition(
+            transform->position.x + frameWidth / 2.8f,
+            transform->position.y + frameHeight / 2.8f);
     }
 
     void render(sf::RenderWindow& window) override {

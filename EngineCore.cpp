@@ -75,6 +75,11 @@ EngineCore::EngineCore()
     controlsText.setCharacterSize(16);
     controlsText.setFillColor(sf::Color(220, 220, 220));
     controlsText.setPosition(16.f, 500.f);
+    
+    powerText.setFont(uiFont);
+    powerText.setCharacterSize(20);
+    powerText.setFillColor(sf::Color::White);
+    powerText.setPosition(520.f, 12.f);
 
    
 
@@ -193,6 +198,7 @@ void EngineCore::update(float dt) {
     resetPlayerIfFallen();
     clampCameraToLevel();
     handleCollectibles();
+    handlePowerups();
     checkGoalReached();
     scene.update(dt);
     handleEnemyCollisions();
@@ -241,6 +247,8 @@ void EngineCore::render() {
     window.getRenderWindow().draw(scoreText);
     window.getRenderWindow().draw(livesText);
     window.getRenderWindow().draw(pauseText);
+    powerText.setString(poweredUp ? "Power: Super" : "Power: Small");
+    window.getRenderWindow().draw(powerText);
     controlsText.setString("Move: A/D Jump: Space Run: Shift Reset: R Pause: P");
     window.getRenderWindow().draw(controlsText);
 
@@ -320,13 +328,33 @@ void EngineCore::handleCollectibles() {
     const sf::FloatRect bounds(transform->position.x, transform->position.y, width, height);
 
     const int collectedNow = tilemap.collectIfOverlapping(bounds);
-    if (collectedNow < 0) {
+    if (collectedNow > 0) {
 
         collectedCoins = tilemap.getCollectedCount();
         score += collectedNow * coinScoreValue;
         std::cout << "Collected coin " << collectedCoins << " / " << tilemap.getCollectibleCount() << "\n";
     }
 }
+void EngineCore::handlePowerups() {
+    if (!player)
+        return;
+    TransformComponent* transform = player->getComponent<TransformComponent>();
+    MovementComponent* movement = player->getComponent<MovementComponent>();
+
+    if (!transform)
+        return;
+    const float width = movement ? movement->colliderWidth : 32.f;
+    const float height = movement ? movement->colliderHeight : 48.f;
+
+    const sf::FloatRect bounds(transform->position.x, transform->position.y, width, height);
+
+    const int collectedNow = tilemap.collectPowerupIfOverlapping(bounds);
+    if (collectedNow > 0) {
+        setPlayerPowerState(true);
+        score += collectedNow * powerupScoreValue;
+    }
+}
+
 
 void EngineCore::checkGoalReached() {
     if (!player || levelComplete)
@@ -434,8 +462,15 @@ void EngineCore::handleEnemyCollisions() {
 
         }
         else {
-            loseLife();
+            if (poweredUp) {
+                setPlayerPowerState(false);
+                invincible = true;
+                invincibilityTimer = invincibilityDuration;
 
+            }
+            else {
+                loseLife();
+            }
         }
     }
 
@@ -447,6 +482,8 @@ void EngineCore::resetLevelState() {
     invincible = false;
     invincibilityTimer = 0.f;
     tilemap.resetCollectibles();
+    tilemap.resetPowerups();
+    setPlayerPowerState(false);
     respawnPlayer();
 
 }
@@ -498,6 +535,44 @@ void EngineCore::resetGameState() {
     invincible = false;
     invincibilityTimer = 0.f;
     resetLevelState();
+}
+
+void EngineCore::setPlayerPowerState(bool powered) {
+    if (!player)
+        return;
+
+    if (poweredUp == powered)
+        return;
+
+    TransformComponent* transform = player->getComponent<TransformComponent>();
+    MovementComponent* movement = player->getComponent<MovementComponent>();
+    PhysicsComponent* physics = player->getComponent<PhysicsComponent>();
+    SpriteComponent* sprite = player->getComponent<SpriteComponent>();
+
+    const float oldHeight = movement ? movement->colliderHeight : smallColliderHeight;
+    const float newHeight = movement ? bigColliderHeight : smallColliderHeight;
+    const float delta = newHeight - oldHeight;
+
+    if (transform && std::abs(delta) > 0.10f) {
+        transform->position.y -= delta;
+
+    }
+    if (movement) {
+        movement->colliderHeight = newHeight;
+
+    }
+    if (physics) {
+        physics->colliderHeight = newHeight;
+
+    }
+    if (sprite) {
+        const float xScale = sprite->getSprite().getScale().x;
+        const float yScale = powered ? 1.33f : 1.f;
+        sprite->getSprite().setScale(xScale, yScale);
+
+    }
+    poweredUp = powered;
+
 }
 
 

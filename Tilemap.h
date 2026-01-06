@@ -17,10 +17,15 @@ public:
     std::vector<sf::Vector2i> goalTiles;
     std::vector<sf::Vector2f> collectibles;
     std::vector<bool> collectibleCollected;
+    std::vector<sf::Vector2f> powerups;
+    std::vector<bool> powerupCollected;
 
 
     sf::Texture tilesetTexture;
     sf::Sprite tileSprite;
+    sf::Texture powerupTexture;
+    sf::Sprite powerupSprite;
+    bool powerupTextureLoaded = false;
 
     Tilemap() = default;
 
@@ -38,6 +43,18 @@ public:
         }
 
         tileSprite.setTexture(tilesetTexture);
+        powerupTextureLoaded = powerupTexture.loadFromFile("Assets/powerup.png");
+        if (powerupTextureLoaded) {
+            powerupSprite.setTexture(powerupTexture);
+            powerupSprite.setOrigin(
+                static_cast<float>(powerupTexture.getSize().x) / 2.f,
+                static_cast<float>(powerupTexture.getSize().y) / 2.f);
+            const float targetSize = static_cast<float>(tileSize) * 0.8f;
+            const float scaleX = targetSize / static_cast<float>(powerupTexture.getSize().x);
+            const float scaleY = targetSize / static_cast<float>(powerupTexture.getSize().y);
+
+            powerupSprite.setScale(scaleX, scaleY);
+        }
     }
 
     // TEMP level generator (safe)
@@ -75,6 +92,9 @@ public:
         goalTiles.clear();
         collectibles.clear();
         collectibleCollected.clear();
+        powerups.clear();
+        powerupCollected.clear();
+
 
 
 
@@ -106,6 +126,14 @@ public:
                     const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
                     collectibles.emplace_back(worldX, worldY);
                     collectibleCollected.push_back(false);
+                    break;
+                }
+                case 'M':
+                case 'm': {
+                    const float worldX = static_cast<float>(x * tileSize + tileSize / 2);
+                    const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
+                    powerups.emplace_back(worldX, worldY);
+                    powerupCollected.push_back(false);
                     break;
                 }
                 default:
@@ -158,6 +186,30 @@ public:
             coinShape.setPosition(collectibles[i]);
             window.draw(coinShape);
         }
+        if (powerupTextureLoaded) {
+            for (std::size_t i = 0; i < powerups.size(); ++i) {
+                if (i < powerupCollected.size() && powerupCollected[i])
+                    continue;
+
+                powerupSprite.setPosition(powerups[i]);
+                window.draw(powerupSprite);
+            }
+        }
+        else {
+            sf::RectangleShape powerupShape(sf::Vector2f(static_cast<float>(tileSize) * 0.8f, static_cast<float>(tileSize) * 0.8f));
+            powerupShape.setFillColor(sf::Color(220, 80, 80));
+            powerupShape.setOrigin(powerupShape.getSize() / 2.f);
+            for (std::size_t i = 0; i < powerups.size(); ++i) {
+                if (i < powerupCollected.size() && powerupCollected[i])
+                    continue;
+
+                powerupShape.setPosition(powerups[i]);
+                window.draw(powerupShape);
+            }
+        
+
+        }
+
 
         // Render goals as highlighted tiles
         sf::RectangleShape goalShape(sf::Vector2f(static_cast<float>(tileSize), static_cast<float>(tileSize)));
@@ -221,6 +273,12 @@ public:
         collectibleCollected.assign(collectibleCollected.size(), false);
 
     }
+    int getPowerCount() const {
+        return static_cast<int>(powerups.size());
+    }
+    void resetPowerups() {
+        powerupCollected.assign(powerupCollected.size(), false);
+    }
 
     int getCollectedCount() const {
         int count = 0;
@@ -238,6 +296,19 @@ public:
 
             if (bounds.contains(collectibles[i])) {
                 collectibleCollected[i] = true;
+                ++collectedCount;
+
+            }
+        }
+        return collectedCount;
+    }
+    int collectPowerupIfOverlapping(const sf::FloatRect& bounds) {
+        int collectedCount = 0;
+        for (std::size_t i = 0; i < powerups.size() && i < powerupCollected.size(); ++i) {
+            if (powerupCollected[i])
+                continue;
+            if (bounds.contains(powerups[i])) {
+                powerupCollected[i] = true;
                 ++collectedCount;
 
             }

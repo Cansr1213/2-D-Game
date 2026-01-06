@@ -37,13 +37,18 @@ private:
     sf::Text goalText;
     sf::Text gameOverText;
     sf::Text controlsText;
+    sf::Text powerText;
     float goalMessageTimer = 0.f;
     const float goalMessageDuration = 2.5f;
     bool invincible = false;
 	float invincibilityTimer = 0.f;
 	const float invincibilityDuration = 1.5f;
+    bool poweredUp = false;
     const int coinScoreValue = 100;
     const int goalScoreValue = 500;
+    const int powerupScoreValue = 1000;
+    const float smallColliderHeight = 48.f;
+    const float bigColliderHeight = 64.f;
 
 
 
@@ -58,12 +63,15 @@ private:
     void respawnPlayer();
     void resetPlayerIfFallen();
     void handleCollectibles();
+    void handlePowerups();
     void checkGoalReached();
     void handleEnemyCollisions();
     void updateInvincibility(float dt);
     void loseLife();
     void resetLevelState();
     void resetGameState();
+    void setPlayerPowerState(bool powered);
+
 
 
 };
