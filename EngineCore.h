@@ -3,6 +3,8 @@
 #include "Scene.h"
 #include "Tilemap.h"
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
+
 
 class EngineCore {
 public:
@@ -38,6 +40,7 @@ private:
     sf::Text gameOverText;
     sf::Text controlsText;
     sf::Text powerText;
+    sf::Music backgroundMusic;
     float goalMessageTimer = 0.f;
     const float goalMessageDuration = 2.5f;
     bool invincible = false;
@@ -49,6 +52,9 @@ private:
     const int powerupScoreValue = 1000;
     const float smallColliderHeight = 48.f;
     const float bigColliderHeight = 64.f;
+    float powerupFlashTimer = 0.f;
+    float powerupFlashDuration = 0.35f;
+
 
 
 
@@ -67,6 +73,7 @@ private:
     void checkGoalReached();
     void handleEnemyCollisions();
     void updateInvincibility(float dt);
+    void updatePowerupFlash(float dt);
     void loseLife();
     void resetLevelState();
     void resetGameState();

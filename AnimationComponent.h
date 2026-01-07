@@ -10,6 +10,7 @@ enum class AnimState {
 class AnimationComponent : public Component {
 public:
     SpriteComponent* spriteComp;
+    bool paused = false;
 
     int frameWidth;
     int frameHeight;
@@ -147,6 +148,9 @@ public:
     }
 
     void update(float dt) override {
+        if (paused) {
+            return;
+        }
         currentTime += dt;
         if (currentTime < frameTime) return;
         currentTime = 0.f;

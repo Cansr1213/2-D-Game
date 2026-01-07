@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <cmath>
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
+
 
 namespace {
     std::filesystem::path findAssetsRoot() {
@@ -89,7 +91,14 @@ EngineCore::EngineCore()
     if (tilemap.hasSpawnPoint()) {
         playerSpawn = tilemap.getSpawnPoint();
     }
-
+    if (backgroundMusic.openFromFile("Assets/music.wav")) {
+        backgroundMusic.setLoop(true);
+        backgroundMusic.setVolume(40.f);
+        backgroundMusic.play();
+    }
+    else {
+        std::cerr << "Failed to load background music  Assets/music.wav\n";
+    }
 
     
     // ✅ CREATE ONE PLAYER ENTITY
@@ -114,7 +123,7 @@ EngineCore::EngineCore()
         goombaSprite->getSprite().setTextureRect(sf::IntRect(0, 0, 32, 32));
         goomba->addComponent<PhysicsComponent>(goombaTransform, &tilemap, 32.f, 32.f, false);
         goomba->addComponent<EnemyComponent>(goombaTransform, &tilemap, 32.f, 32.f);
-        goomba->addComponent<AnimationComponent>(goombaSprite, 47, 0, 6, 0.12f);
+        goomba->addComponent<AnimationComponent>(goombaSprite, 47, 0, 6, 0.20f);
     }
 
 
@@ -193,8 +202,9 @@ void EngineCore::update(float dt) {
         return;
 
     }
-
+    tilemap.update(dt);
 	updateInvincibility(dt);
+    updatePowerupFlash(dt);
     resetPlayerIfFallen();
     clampCameraToLevel();
     handleCollectibles();
@@ -351,6 +361,7 @@ void EngineCore::handlePowerups() {
     const int collectedNow = tilemap.collectPowerupIfOverlapping(bounds);
     if (collectedNow > 0) {
         setPlayerPowerState(true);
+        powerupFlashTimer = powerupFlashDuration;
         score += collectedNow * powerupScoreValue;
     }
 }
@@ -454,8 +465,11 @@ void EngineCore::handleEnemyCollisions() {
             }
             if (SpriteComponent* sprite = entity->getComponent<SpriteComponent>()) {
                 const float currentXScale = sprite->getSprite().getScale().x;
-                sprite->getSprite().setScale(currentXScale, 0.5f);
+                sprite->getSprite().setScale(currentXScale, 0.25f);
 
+            }
+            if (AnimationComponent* anim = entity->getComponent<AnimationComponent>()) {
+                anim->paused = true;
             }
             playerPhysics->velocityY = -250.f;
             playerPhysics->onGround = false;
@@ -481,6 +495,7 @@ void EngineCore::resetLevelState() {
     collectedCoins = 0;
     invincible = false;
     invincibilityTimer = 0.f;
+    powerupFlashTimer = 0.f;
     tilemap.resetCollectibles();
     tilemap.resetPowerups();
     setPlayerPowerState(false);
@@ -503,6 +518,35 @@ void EngineCore::updateInvincibility(float dt) {
         if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
             const float alpha = (static_cast<int>(invincibilityTimer * 10.f) % 2 == 0) ? 120.f : 255.f;
             sprite->getSprite().setColor(sf::Color(255, 255, 255, static_cast<sf::Uint8>(alpha)));
+        }
+    }
+}
+
+void EngineCore::updatePowerupFlash(float dt) {
+    if (powerupFlashTimer <= 0.f || !player) {
+        return;
+    }
+    powerupFlashTimer = std::max(0.f, powerupFlashTimer - dt);
+
+    if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+        const float t = powerupFlashTimer / std::max(powerupFlashDuration, 0.001f);
+        const float pulse = 1.f + 0.1f * std::sin((1.f - t) * 12.f);
+        const sf::Vector2f currentScale = sprite->getSprite().getScale();
+        const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
+        const float baseY = poweredUp ? 1.33f : 1.f;
+        sprite->getSprite().setScale(
+            baseX * pulse,
+            baseY * pulse);
+        const sf::Uint8 alpha = static_cast<sf::Uint8>(200 + 55 * t);
+        sprite->getSprite().setColor(sf::Color(255, 255, 200, alpha));
+    }
+    if (powerupFlashTimer <= 0.f) {
+        if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+            sprite->getSprite().setColor(sf::Color(255, 255, 255, 255));
+            const sf::Vector2f currentScale = sprite->getSprite().getScale();
+            const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
+            const float baseY = poweredUp ? 1.33f : 1.f;
+            sprite->getSprite().setScale(baseX, baseY);
         }
     }
 }
@@ -534,6 +578,7 @@ void EngineCore::resetGameState() {
     gameOver = false;
     invincible = false;
     invincibilityTimer = 0.f;
+    powerupFlashTimer = 0.f;
     resetLevelState();
 }
 

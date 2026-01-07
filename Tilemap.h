@@ -5,6 +5,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
+#include <cmath>
 
 
 class Tilemap {
@@ -26,6 +27,12 @@ public:
     sf::Texture powerupTexture;
     sf::Sprite powerupSprite;
     bool powerupTextureLoaded = false;
+    float powerupAnimTime = 0.f;
+    float powerupBobAmplitude = 5.f;
+    float powerupBobSpeed = 2.2f;
+    float powerupPulseSpeed = 3.1f;
+    float powerupBaseScaleX = 1.f;
+    float powerupBaseScaleY = 1.f;
 
     Tilemap() = default;
 
@@ -49,11 +56,14 @@ public:
             powerupSprite.setOrigin(
                 static_cast<float>(powerupTexture.getSize().x) / 2.f,
                 static_cast<float>(powerupTexture.getSize().y) / 2.f);
-            const float targetSize = static_cast<float>(tileSize) * 0.8f;
+            const float targetSize = static_cast<float>(tileSize) * 1.5f;
             const float scaleX = targetSize / static_cast<float>(powerupTexture.getSize().x);
             const float scaleY = targetSize / static_cast<float>(powerupTexture.getSize().y);
 
             powerupSprite.setScale(scaleX, scaleY);
+            powerupBaseScaleX = scaleX;
+            powerupBaseScaleY = scaleY;
+
         }
     }
 
@@ -152,7 +162,9 @@ public:
 
     // No update needed yet, but included for engine consistency
     void update(float dt) {
-        // Tilemaps are static for now
+        powerupAnimTime += dt;
+
+        
     }
 
     void render(sf::RenderWindow& window) {
@@ -191,7 +203,15 @@ public:
                 if (i < powerupCollected.size() && powerupCollected[i])
                     continue;
 
-                powerupSprite.setPosition(powerups[i]);
+                const float bobOffset = std::sin(powerupAnimTime * powerupBobSpeed + static_cast<float>(i) * 0.6f) * powerupBobAmplitude;
+                const float pulse = 1.f + 0.08f * std::sin(powerupAnimTime * powerupPulseSpeed + static_cast<float>(i));
+                powerupSprite.setScale(powerupBaseScaleX * pulse, powerupBaseScaleY * pulse);
+                const float glow = 0.8f + 0.2f * std::sin(powerupAnimTime * powerupPulseSpeed + static_cast<float>(i) * 1.4f);
+                const sf::Uint8 alpha = static_cast<sf::Uint8>(200 + 55 * glow);
+                powerupSprite.setColor(sf::Color(255, 255, 255, alpha));
+                powerupSprite.setPosition(sf::Vector2f(powerups[i].x, powerups[i].y + bobOffset));
+
+
                 window.draw(powerupSprite);
             }
         }
