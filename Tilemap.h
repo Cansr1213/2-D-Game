@@ -6,11 +6,20 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cmath>
+#include <cctype>
+#include <iostream>
+
 
 
 class Tilemap {
 public:
     int tileSize = 32;
+    int tileSourceWidth = 32;
+    int tileSourceHeight = 32;
+    int tilesetColumns = 1;
+    int tilesetRows = 1;
+    float tileScaleX = 1.f;
+    float tileScaleY = 1.f;
 
     std::vector<std::vector<int>> tiles;
     std::vector<sf::Vector2i> spawnTiles;
@@ -33,6 +42,7 @@ public:
     float powerupPulseSpeed = 3.1f;
     float powerupBaseScaleX = 1.f;
     float powerupBaseScaleY = 1.f;
+    bool warnedInvalidTileIndex = false;
 
     Tilemap() = default;
 
@@ -43,13 +53,34 @@ public:
 
     // Load tileset texture
     void loadTileset(const std::string& path, int tileW, int tileH) {
-        tileSize = tileW;
+        tileSourceWidth = tileW;
+        tileSourceHeight = tileH;
+        if (tileSourceWidth <= 0 || tileSourceHeight <= 0) {
+            throw std::runtime_error("Tileset tile size must be posistive");
+        }
+
 
         if (!tilesetTexture.loadFromFile(path)) {
             throw std::runtime_error("Failed to load tileset");
         }
 
+        const auto textureSize = tilesetTexture.getSize();
+        const unsigned int remainderX = textureSize.x % static_cast<unsigned int>(tileSourceWidth);
+        const unsigned int remainderY = textureSize.y % static_cast<unsigned int>(tileSourceHeight);
+        if (remainderX != 0 || remainderY != 0) {
+            std::cerr << "Warning: tileset size " << textureSize.x << "x" << textureSize.y
+                << " is not divisible by tile size " << tileSourceWidth << "x" << tileSourceHeight << ".\n";
+        }
+
         tileSprite.setTexture(tilesetTexture);
+        tilesetColumns = std::max(1, static_cast<int>(tilesetTexture.getSize().x) / tileSourceWidth);
+        tilesetRows = std::max(1, static_cast<int>(tilesetTexture.getSize().y) / tileSourceHeight);
+        tileScaleX = static_cast<float>(tileSize) / static_cast<float>(tileSourceWidth);
+        tileScaleY = static_cast<float>(tileSize) / static_cast<float>(tileSourceHeight);
+        tileSprite.setScale(tileScaleX, tileScaleY);
+        std::cout << "Loaded tileset " << path << " (" << textureSize.x << "x" << textureSize.y
+            << "), tile source " << tileSourceWidth << "x" << tileSourceHeight
+            << ", grid " << tilesetColumns << "x" << tilesetRows << ".\n";
         powerupTextureLoaded = powerupTexture.loadFromFile("Assets/powerup.png");
         if (powerupTextureLoaded) {
             powerupSprite.setTexture(powerupTexture);
@@ -113,11 +144,9 @@ public:
 
                 char c = lines[y][x];
                 int tileVal = 0;
-
+                
+             
                 switch (c) {
-                case '1':
-                    tileVal = 1; // Solid platform
-                    break;
                 case 'S':
                 case 's':
                     spawnTiles.push_back(sf::Vector2i(static_cast<int>(x), static_cast<int>(y)));
@@ -147,6 +176,7 @@ public:
                     break;
                 }
                 default:
+                    tileVal = tileIndexFromChar(c);
                     break;
                 }
 
@@ -171,12 +201,23 @@ public:
         for (int y = 0; y < static_cast<int>(tiles.size()); ++y) {
             for (int x = 0; x < static_cast<int>(tiles[y].size()); ++x) {
 
-                if (tiles[y][x] != 1)
+                if (tiles[y][x] <= 0)
                     continue;
 
                 // Draw ONLY ONE tile region
+                const int maxIndex = tilesetColumns * tilesetRows - 1;
+                const int rawIndex = tiles[y][x] - 1;
+                if (!warnedInvalidTileIndex && rawIndex > maxIndex) {
+                    warnedInvalidTileIndex = true;
+                    std::cerr << "Warning: level references tile index " << tiles[y][x]
+                        << " but tileset grid supports up to " << (maxIndex + 1)
+                        << " tiles.\n";
+                }
+                const int safeIndex = std::clamp(rawIndex, 0, maxIndex);
+                const int tileX = (safeIndex % tilesetColumns) * tileSourceWidth;
+                const int tileY = (safeIndex / tilesetColumns) * tileSourceHeight;
                 tileSprite.setTextureRect(
-                    sf::IntRect(0, 0, tileSize, tileSize)
+                    sf::IntRect(tileX, tileY, tileSourceWidth, tileSourceHeight)
                 );
 
                 tileSprite.setPosition(
@@ -245,7 +286,7 @@ public:
     bool isSolid(int x, int y) const {
         if (y < 0 || y >= static_cast<int>(tiles.size())) return false;
         if (x < 0 || x >= static_cast<int>(tiles[y].size())) return false;
-        return tiles[y][x] == 1;
+        return tiles[y][x] > 0;
     }
 
     int getWidth() const {
@@ -349,4 +390,19 @@ public:
         }
         return false;
     }
+    private:
+        static int tileIndexFromChar(char c) {
+            if (std::isdigit(static_cast<unsigned char>(c))) {
+                return c - '0';
+
+            }
+            if (c >= 'A' && c <= 'Z') {
+                return c - '0';
+            }
+            if (c >= 'a' && c <= 'z') {
+                return 36 + (c - 'a');
+
+            }
+            return 0;
+        }
 };

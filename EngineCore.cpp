@@ -10,6 +10,7 @@
 #include "Tilemap.h"
 #include "AnimationComponent.h"
 #include <iostream>
+#include <exception>
 #include <filesystem>   // REQUIRED for current_path()
 #include <algorithm>
 #include <cmath>
@@ -106,7 +107,13 @@ EngineCore::EngineCore()
    
 
     // ✅ TILEMAP MUST USE TILE TEXTURE (NOT PLAYER)
-    tilemap.loadTileset("Assets/platform.png", 32, 32);
+    try {
+        tilemap.loadTileset("Assets/tileset.png", 16, 16);
+    }
+    catch (const std::exception& ex) {
+        std::cerr << "Failed to load tile image  Assets/tileset.png (" << ex.what() << "). Falling back to Assets/platform.png\n";
+        tilemap.loadTileset("Assets/platform.png", 32, 32);
+    }
     tilemap.loadFromFile("Assets/level1.txt");
     if (tilemap.hasSpawnPoint()) {
         playerSpawn = tilemap.getSpawnPoint();
