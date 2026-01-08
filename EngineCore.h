@@ -83,6 +83,7 @@ private:
     void renderPixelatedScene();
 
     void clampCameraToLevel();
+    void updateCameraFollow();
     void respawnPlayer();
     void resetPlayerIfFallen();
     void handleCollectibles();

@@ -36,7 +36,7 @@ namespace {
 
 
 EngineCore::EngineCore()
-    : window("My 2D Game Engine", 1280, 720),
+    : window("Alice Wild Adventure", 1280, 720),
     tilemap()
 {
     camera = window.getRenderWindow().getDefaultView();
@@ -89,8 +89,8 @@ EngineCore::EngineCore()
 
     startMenuTitleText.setFont(uiFont);
     startMenuTitleText.setCharacterSize(40);
-    startMenuTitleText.setFillColor(sf::Color::White);
-    startMenuTitleText.setString("My 2D Game");
+    startMenuTitleText.setFillColor(sf::Color::Cyan);
+    startMenuTitleText.setString("Alice Wild Adventure");
 
     startMenuPromptText.setFont(uiFont);
     startMenuPromptText.setCharacterSize(20);
@@ -242,11 +242,12 @@ void EngineCore::update(float dt) {
 	updateInvincibility(dt);
     updatePowerupFlash(dt);
     resetPlayerIfFallen();
-    clampCameraToLevel();
     handleCollectibles();
     handlePowerups();
     checkGoalReached();
     scene.update(dt);
+    updateCameraFollow();
+    clampCameraToLevel();
     handleEnemyCollisions();
     if (levelComplete) {
         goalMessageTimer -= dt;
@@ -372,6 +373,53 @@ void EngineCore::renderPixelatedScene() {
         static_cast<float>(windowSize.x) / static_cast<float>(textureWidth),
         static_cast<float>(windowSize.y) / static_cast<float>(textureHeight));
     window.getRenderWindow().draw(pixelateSprite);
+}
+void EngineCore::updateCameraFollow() {
+    if (!player) {
+        return;
+    }
+
+    TransformComponent* transform = player->getComponent<TransformComponent>();
+    MovementComponent* movement = player->getComponent<MovementComponent>();
+
+    if (!transform) {
+        return;
+    }
+
+    const float width = movement ? movement->colliderWidth : 32.f;
+    const float height = movement ? movement->colliderHeight : 48.f;
+    const sf::Vector2f playerCenter(
+        transform->position.x + width / 2.f,
+        transform->position.y + height / 2.f);
+
+    sf::Vector2f center = camera.getCenter();
+    const sf::Vector2f size = camera.getSize();
+    const float halfW = size.x / 2.f;
+    const float halfH = size.y / 2.f;
+
+    const float deadzoneX = size.x * 0.25f;
+    const float deadzoneY = size.y * 0.25f;
+
+    const float leftBound = center.x - halfW + deadzoneX;
+    const float rightBound = center.x + halfW - deadzoneX;
+    const float topBound = center.y - halfH + deadzoneY;
+    const float bottomBound = center.y + halfH - deadzoneY;
+
+    if (playerCenter.x < leftBound) {
+        center.x = playerCenter.x + halfW - deadzoneX;
+    }
+    else if (playerCenter.x > rightBound) {
+        center.x = playerCenter.x - halfW + deadzoneX;
+    }
+
+    if (playerCenter.y < topBound) {
+        center.y = playerCenter.y + halfH - deadzoneY;
+    }
+    else if (playerCenter.y > bottomBound) {
+        center.y = playerCenter.y - halfH + deadzoneY;
+    }
+
+    camera.setCenter(center);
 }
 
 
