@@ -167,7 +167,7 @@ public:
         
     }
 
-    void render(sf::RenderWindow& window) {
+    void render(sf::RenderTarget& target) {
         for (int y = 0; y < static_cast<int>(tiles.size()); ++y) {
             for (int x = 0; x < static_cast<int>(tiles[y].size()); ++x) {
 
@@ -184,7 +184,7 @@ public:
                     static_cast<float>(y * tileSize)
                 );
 
-                window.draw(tileSprite);
+                target.draw(tileSprite);
             }
         }
         sf::CircleShape coinShape(static_cast<float>(tileSize) * 0.35f);
@@ -196,7 +196,7 @@ public:
                 continue;
 
             coinShape.setPosition(collectibles[i]);
-            window.draw(coinShape);
+            target.draw(coinShape);
         }
         if (powerupTextureLoaded) {
             for (std::size_t i = 0; i < powerups.size(); ++i) {
@@ -212,7 +212,7 @@ public:
                 powerupSprite.setPosition(sf::Vector2f(powerups[i].x, powerups[i].y + bobOffset));
 
 
-                window.draw(powerupSprite);
+                target.draw(powerupSprite);
             }
         }
         else {
@@ -224,7 +224,7 @@ public:
                     continue;
 
                 powerupShape.setPosition(powerups[i]);
-                window.draw(powerupShape);
+                target.draw(powerupShape);
             }
         
 
@@ -236,7 +236,7 @@ public:
         goalShape.setFillColor(sf::Color(100, 200, 255, 180));
         for (const auto& tile : goalTiles) {
             goalShape.setPosition(static_cast<float>(tile.x * tileSize), static_cast<float>(tile.y * tileSize));
-            window.draw(goalShape);
+            target.draw(goalShape);
         }
 
 

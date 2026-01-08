@@ -40,6 +40,13 @@ private:
     sf::Text gameOverText;
     sf::Text controlsText;
     sf::Text powerText;
+    sf::Text levelText;
+    sf::Text startMenuTitleText;
+    sf::Text startMenuPromptText;
+    sf::Text beginText;
+    sf::RenderTexture pixelateTexture;
+    sf::Sprite pixelateSprite;
+    sf::Vector2u pixelateTextureSize{ 0, 0 };
     sf::Music backgroundMusic;
     float goalMessageTimer = 0.f;
     const float goalMessageDuration = 2.5f;
@@ -54,6 +61,14 @@ private:
     const float bigColliderHeight = 64.f;
     float powerupFlashTimer = 0.f;
     float powerupFlashDuration = 0.35f;
+    int coinBank = 0;
+    int currentWorld = 1;
+    int currentLevel = 1;
+    bool inStartMenu = true;
+    bool startTransition = false;
+    float startTransitionTimer = 0.f;
+    const float startTransitionDuration = 1.2f;
+    const float beginTextDuration = 0.5f;
 
 
 
@@ -64,6 +79,8 @@ private:
     void processEvents();
     void update(float dt);
     void render();
+    void renderScene(sf::RenderTarget& target);
+    void renderPixelatedScene();
 
     void clampCameraToLevel();
     void respawnPlayer();

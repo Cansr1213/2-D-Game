@@ -32,9 +32,9 @@ public:
 
 
 	}
-	void render(sf::RenderWindow& window) {
+	void render(sf::RenderTarget& target) {
 		for (auto& e : entities)
-			e->render(window);
+			e->render(target);
 
 	}
 	

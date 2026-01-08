@@ -23,11 +23,11 @@ public:
 
 	}
 
-	void render(sf::RenderWindow& window) {
+	void render(sf::RenderTarget& target) {
 		if (!active)
 			return;
 		for (auto& c : components)
-			c->render(window);
+			c->render(target);
 
 	}
 

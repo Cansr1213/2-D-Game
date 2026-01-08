@@ -34,9 +34,9 @@ public:
             transform->position.y + frameHeight / 2.5f);
     }
 
-    void render(sf::RenderWindow& window) override {
+    void render(sf::RenderTarget& target) override {
         if (!visible) return;
-        window.draw(sprite);
+        target.draw(sprite);
     }
 
     sf::Sprite& getSprite() { return sprite; }

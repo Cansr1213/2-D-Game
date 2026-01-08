@@ -36,7 +36,7 @@ namespace {
 
 
 EngineCore::EngineCore()
-    : window("My 2D Game Engine", 800, 600),
+    : window("My 2D Game Engine", 1280, 720),
     tilemap()
 {
     camera = window.getRenderWindow().getDefaultView();
@@ -45,20 +45,20 @@ EngineCore::EngineCore()
         std::cerr << "Failed to load UI font Assets/DejaVuSans.tff\n";
 
     }
+    livesText.setFont(uiFont);
+    livesText.setCharacterSize(20);
+    livesText.setFillColor(sf::Color::White);
+    livesText.setPosition(16.f, 12.f);
+
     coinText.setFont(uiFont);
     coinText.setCharacterSize(20);
     coinText.setFillColor(sf::Color::White);
-    coinText.setPosition(16.f, 12.f);
+    coinText.setPosition(150.f, 12.f);
 
     scoreText.setFont(uiFont);
-    scoreText.setCharacterSize(20);
+    scoreText.setCharacterSize(18);
     scoreText.setFillColor(sf::Color::White);
-    scoreText.setPosition(200.f, 12.f);
-
-    livesText.setFont(uiFont);
-    livesText.setCharacterSize(32);
-    livesText.setFillColor(sf::Color::White);
-    livesText.setPosition(380.f, 12.f);
+    scoreText.setPosition(16.f, 40.f);
 
     pauseText.setFont(uiFont);
     pauseText.setCharacterSize(20);
@@ -81,7 +81,27 @@ EngineCore::EngineCore()
     powerText.setFont(uiFont);
     powerText.setCharacterSize(20);
     powerText.setFillColor(sf::Color::White);
-    powerText.setPosition(520.f, 12.f);
+    powerText.setPosition(16.f, 66.f);
+
+    levelText.setFont(uiFont);
+    levelText.setCharacterSize(20);
+    levelText.setFillColor(sf::Color::White);
+
+    startMenuTitleText.setFont(uiFont);
+    startMenuTitleText.setCharacterSize(40);
+    startMenuTitleText.setFillColor(sf::Color::White);
+    startMenuTitleText.setString("My 2D Game");
+
+    startMenuPromptText.setFont(uiFont);
+    startMenuPromptText.setCharacterSize(20);
+    startMenuPromptText.setFillColor(sf::Color::Yellow);
+    startMenuPromptText.setString("Press Enter to Start");
+
+    beginText.setFont(uiFont);
+    beginText.setCharacterSize(28);
+    beginText.setFillColor(sf::Color::White);
+    beginText.setString("Begin!");
+
 
    
 
@@ -153,27 +173,43 @@ void EngineCore::processEvents() {
             window.close();
 
         }
-        if (event.type == sf::Event::KeyPressed) {
-            if (event.key.code == sf::Keyboard::Escape) {
+    if (event.type == sf::Event::KeyPressed) {
+        if (event.key.code == sf::Keyboard::Escape) {
                 window.close();
 
-            }
-            if (event.key.code == sf::Keyboard::P) {
-                paused = !paused;
-                std::cout << (!paused ? "Game paused\n" : "Game resume\n");
-            }
+        }
+        if (inStartMenu && !startTransition && event.key.code == sf::Keyboard::Enter) {
+            startTransition = true;
+            startTransitionTimer = startTransitionDuration;
+           
+            resetGameState();
+
+        }
+        if (!inStartMenu && event.key.code == sf::Keyboard::P) {
+            paused = !paused;
+            std::cout << (!paused ? "Game paused\n" : "Game continue\n");
+
+        }
+
+         
         }
     }
 
 }
 
 void EngineCore::update(float dt) {
+   
     // -- CAMERA FOLLOW LOGIC -- //
-    if (player) {
-        TransformComponent* t = player->getComponent<TransformComponent>();
-        if (t) {
-            camera.setCenter(t->position);
+    if (inStartMenu) {
+        if (startTransition) {
+            startTransitionTimer = std::max(0.f, startTransitionTimer - dt);
+            if (startTransitionTimer <= 0.f) {
+                inStartMenu = false;
+                startTransition = false;
+
+            }
         }
+        return;
     
 
     }
@@ -228,51 +264,116 @@ void EngineCore::render() {
     window.beginDraw();
 
     // Camera view
-    window.getRenderWindow().setView(camera);
+    if (inStartMenu && startTransition) {
+        renderPixelatedScene();
+    }
+    else {
+        renderScene(window.getRenderWindow());
+    }
 
     // Draw tilemap BEFORE entities 
-    tilemap.render(window.getRenderWindow());
-
-    // Draw entities
-    scene.render(window.getRenderWindow());
-
-    // Rest view
     window.getRenderWindow().setView(window.getRenderWindow().getDefaultView());
 
-    coinText.setString("Coins: " + std::to_string(collectedCoins) + " / " + std::to_string((tilemap.getCollectibleCount())));
-    scoreText.setString("Score: " + std::to_string(score));
-    livesText.setString("Lives: " + std::to_string(lives));
-    pauseText.setString(paused ? "Paused" : "");
-
-    if (goalMessageTimer > 0.f) {
-        goalText.setString("Goal reached!");
-        const sf::FloatRect bounds = goalText.getLocalBounds();
-        const sf::Vector2u  windowSize = window.getRenderWindow().getSize();
-        goalText.setOrigin(bounds.left + bounds.width / 2.f, bounds.top + bounds.height / 2.f);
-        goalText.setPosition(static_cast<float>(windowSize.x) / 2.f, 100.f);
-        window.getRenderWindow().draw(goalText);
-
-    }
-    window.getRenderWindow().draw(coinText);
-    window.getRenderWindow().draw(scoreText);
-    window.getRenderWindow().draw(livesText);
-    window.getRenderWindow().draw(pauseText);
-    powerText.setString(poweredUp ? "Power: Super" : "Power: Small");
-    window.getRenderWindow().draw(powerText);
-    controlsText.setString("Move: A/D Jump: Space Run: Shift Reset: R Pause: P");
-    window.getRenderWindow().draw(controlsText);
-
-    if (gameOver) {
-        gameOverText.setString("Gameover - Press R to Restart");
-        const sf::FloatRect bounds = gameOverText.getLocalBounds();
+    // Draw entities
+    if (!inStartMenu) {
+        livesText.setString("Lives: " + std::to_string(lives));
+        coinText.setString("Coins: " + std::to_string(coinBank));
+        scoreText.setString("Score: " + std::to_string(score));
+        pauseText.setString(paused ? "Paused" : "");
+        levelText.setString(std::to_string(currentWorld) + "-" + std::to_string(currentLevel) + " World");
+        const sf::FloatRect levelBounds = levelText.getLocalBounds();
         const sf::Vector2u windowSize = window.getRenderWindow().getSize();
-        gameOverText.setPosition(static_cast<float>(windowSize.x) / 2.f, 140.f);
-        window.getRenderWindow().draw(gameOverText);
+        levelText.setPosition(static_cast<float>(windowSize.x) - levelBounds.width - 16.f, 12.f);
+
+        if (goalMessageTimer > 0.f) {
+            goalText.setString("Goal reached!");
+            const sf::FloatRect bounds = goalText.getLocalBounds();
+            const sf::Vector2u  windowSize = window.getRenderWindow().getSize();
+            goalText.setOrigin(bounds.left + bounds.width / 2.f, bounds.top + bounds.height / 2.f);
+            goalText.setPosition(static_cast<float>(windowSize.x) / 2.f, 100.f);
+            window.getRenderWindow().draw(goalText);
+        }
+        window.getRenderWindow().draw(coinText);
+        window.getRenderWindow().draw(scoreText);
+        window.getRenderWindow().draw(livesText);
+        window.getRenderWindow().draw(pauseText);
+        window.getRenderWindow().draw(levelText);
+        powerText.setString(poweredUp ? "Power: Super" : "Power: Small");
+        window.getRenderWindow().draw(powerText);
+        controlsText.setString("Move: A/D Jump: Space Run: Shift Reset: R Pause: P");
+        window.getRenderWindow().draw(controlsText);
+
+        if (gameOver) {
+            gameOverText.setString("Gameover - Press R to Restart");
+            const sf::FloatRect bounds = gameOverText.getLocalBounds();
+            const sf::Vector2u windowSize = window.getRenderWindow().getSize();
+            gameOverText.setPosition(static_cast<float>(windowSize.x) / 2.f, 140.f);
+            window.getRenderWindow().draw(gameOverText);
+        }
     }
+
+    if (inStartMenu && !startTransition) {
+        const sf::FloatRect titleBounds = startMenuTitleText.getLocalBounds();
+        const sf::FloatRect promptBounds = startMenuPromptText.getLocalBounds();
+        const sf::Vector2u menuSize = window.getRenderWindow().getSize();
+        startMenuTitleText.setOrigin(titleBounds.left + titleBounds.width / 2.f, titleBounds.top + titleBounds.height / 2.f);
+        startMenuTitleText.setPosition(static_cast<float>(menuSize.x) / 2.f, 200.f);
+        startMenuPromptText.setOrigin(promptBounds.left + promptBounds.width / 2.f, promptBounds.top + promptBounds.height / 2.f);
+        startMenuPromptText.setPosition(static_cast<float>(menuSize.x) / 2.f, 280.f);
+        window.getRenderWindow().draw(startMenuTitleText);
+        window.getRenderWindow().draw(startMenuPromptText);
+
+
+
+    
+
+    }
+    if (startTransition && startTransitionTimer <= beginTextDuration) {
+        const sf::Vector2u windowSize = window.getRenderWindow().getSize();
+        const sf::FloatRect beginBounds = beginText.getLocalBounds();
+        beginText.setOrigin(beginBounds.left + beginBounds.width / 2.f, beginBounds.top + beginBounds.height / 2.f);
+        beginText.setPosition(static_cast<float>(windowSize.x) / 2.f, 220.f);
+        window.getRenderWindow().draw(beginText);
+    }
+
 
     window.endDraw();
 
 }
+void EngineCore::renderScene(sf::RenderTarget& target) {
+    const sf::View previousView = target.getView();
+    target.setView(camera);
+    tilemap.render(target);
+    scene.render(target);
+    target.setView(previousView);
+}
+
+void EngineCore::renderPixelatedScene() {
+    const sf::Vector2u windowSize = window.getRenderWindow().getSize();
+    const float progress = 1.f - (startTransitionTimer / std::max(startTransitionDuration, 0.001f));
+    const float startPixelSize = 24.f;
+    const float pixelSize = std::max(1.f, startPixelSize * (1.f - progress) + 1.f);
+    const unsigned int textureWidth = std::max(1u, static_cast<unsigned int>(windowSize.x / pixelSize));
+    const unsigned int textureHeight = std::max(1u, static_cast<unsigned int>(windowSize.y / pixelSize));
+
+    if (textureWidth != pixelateTextureSize.x || textureHeight != pixelateTextureSize.y) {
+        pixelateTexture.create(textureWidth, textureHeight);
+        pixelateTexture.setSmooth(false);
+        pixelateTextureSize = { textureWidth, textureHeight };
+    }
+
+    pixelateTexture.clear(sf::Color::Black);
+    renderScene(pixelateTexture);
+    pixelateTexture.display();
+
+    pixelateSprite.setTexture(pixelateTexture.getTexture(), true);
+    pixelateSprite.setPosition(0.f, 0.f);
+    pixelateSprite.setScale(
+        static_cast<float>(windowSize.x) / static_cast<float>(textureWidth),
+        static_cast<float>(windowSize.y) / static_cast<float>(textureHeight));
+    window.getRenderWindow().draw(pixelateSprite);
+}
+
 
 void EngineCore::clampCameraToLevel() {
     const int levelWidth = tilemap.getPixelWidth();
@@ -342,6 +443,11 @@ void EngineCore::handleCollectibles() {
 
         collectedCoins = tilemap.getCollectedCount();
         score += collectedNow * coinScoreValue;
+        coinBank += collectedNow;
+        while (coinBank >= 100) {
+            coinBank -= 100;
+            lives += 1;
+        }
         std::cout << "Collected coin " << collectedCoins << " / " << tilemap.getCollectibleCount() << "\n";
     }
 }
@@ -493,6 +599,7 @@ void EngineCore::resetLevelState() {
     levelComplete = false;
     goalMessageTimer = 0.f;
     collectedCoins = 0;
+    coinBank = 0;
     invincible = false;
     invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;
@@ -576,6 +683,7 @@ void EngineCore::resetGameState() {
     score = 0;
     lives = 3;
     gameOver = false;
+    paused = false;
     invincible = false;
     invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;

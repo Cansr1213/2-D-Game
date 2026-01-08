@@ -7,5 +7,5 @@ public:
 	Entity* entity = nullptr; // REQUIRED
 	virtual ~Component() = default;
 	virtual void update(float dt) {}
-	virtual void render(sf::RenderWindow& window) {}
+	virtual void render(sf::RenderTarget& target) {}
 };
