@@ -37,7 +37,7 @@ namespace {
 
 
 EngineCore::EngineCore()
-    : window("Alice Wild Adventure", 1280, 720),
+    : window("Alice Wild Adventure", 1920, 1080),
     tilemap()
 {
     camera = window.getRenderWindow().getDefaultView();
@@ -208,6 +208,11 @@ void EngineCore::update(float dt) {
    
     // -- CAMERA FOLLOW LOGIC -- //
     if (inStartMenu) {
+        if (player) {
+            if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+                sprite->setVisible(false);
+            }
+        }
         if (startTransition) {
             startTransitionTimer = std::max(0.f, startTransitionTimer - dt);
             if (startTransitionTimer <= 0.f) {
@@ -219,6 +224,11 @@ void EngineCore::update(float dt) {
         return;
     
 
+    }
+    if (player) {
+        if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+            sprite->setVisible(true);
+        }
     }
     
     
@@ -248,11 +258,20 @@ void EngineCore::update(float dt) {
     tilemap.update(dt);
 	updateInvincibility(dt);
     updatePowerupFlash(dt);
+    if (playerDying) {
+        scene.update(dt);
+        updatePlayerDeath(dt);
+        clampPlayerToLevel();
+        updateCameraFollow();
+        clampCameraToLevel();
+        return;
+    }
     resetPlayerIfFallen();
     handleCollectibles();
     handlePowerups();
     checkGoalReached();
     scene.update(dt);
+    clampPlayerToLevel();
     updateCameraFollow();
     clampCameraToLevel();
     handleEnemyCollisions();
@@ -427,6 +446,92 @@ void EngineCore::updateCameraFollow() {
     }
 
     camera.setCenter(center);
+}
+
+void EngineCore::clampPlayerToLevel() {
+    if (!player)
+        return;
+
+    TransformComponent* transform = player->getComponent<TransformComponent>();
+    MovementComponent* movement = player->getComponent<MovementComponent>();
+
+    if (!transform)
+        return;
+
+    const float width = movement ? movement->colliderWidth : 32.f;
+    const float height = movement ? movement->colliderHeight : 48.f;
+    const float maxX = static_cast<float>(tilemap.getPixelWidth()) - width;
+    const float maxY = static_cast<float>(tilemap.getPixelHeight()) - height;
+
+    transform->position.x = std::clamp(transform->position.x, 0.f, std::max(0.f, maxX));
+    transform->position.y = std::clamp(transform->position.y, 0.f, std::max(0.f, maxY));
+}
+
+void EngineCore::startPlayerDeath() {
+    if (!player)
+        return;
+
+    playerDying = true;
+    deathTimer = deathDuration;
+
+    if (TransformComponent* transform = player->getComponent<TransformComponent>()) {
+        deathStartPosition = transform->position;
+    }
+    if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
+        movement->setCrouching(false);
+        movement->enabled = false;
+    }
+    if (PhysicsComponent* physics = player->getComponent<PhysicsComponent>()) {
+        physics->enabled = false;
+        physics->velocityY = 0.f;
+    }
+    if (AnimationComponent* anim = player->getComponent<AnimationComponent>()) {
+        anim->paused = true;
+    }
+}
+
+void EngineCore::updatePlayerDeath(float dt) {
+    if (!playerDying || !player)
+        return;
+
+    deathTimer = std::max(0.f, deathTimer - dt);
+    const float progress = 1.f - (deathTimer / std::max(deathDuration, 0.001f));
+
+    TransformComponent* transform = player->getComponent<TransformComponent>();
+    SpriteComponent* sprite = player->getComponent<SpriteComponent>();
+    MovementComponent* movement = player->getComponent<MovementComponent>();
+
+    if (transform) {
+        const float lift = std::sin(progress * 3.14159f) * deathFloatHeight;
+        transform->position.y = deathStartPosition.y - lift;
+    }
+    if (sprite) {
+        const sf::Vector2f currentScale = sprite->getSprite().getScale();
+        const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
+        const float baseY = movement ? movement->baseScaleY : std::abs(currentScale.y);
+        const float wobble = 1.f + 0.2f * std::sin(progress * 10.f);
+        const float shrink = 1.f - 0.4f * progress;
+        sprite->getSprite().setScale(baseX * wobble, baseY * shrink);
+        sprite->getSprite().rotate(deathSpinSpeed * dt);
+    }
+
+    if (deathTimer <= 0.f) {
+        playerDying = false;
+        if (sprite) {
+            sprite->getSprite().setRotation(0.f);
+        }
+        if (movement) {
+            movement->enabled = true;
+            movement->setCrouching(false);
+        }
+        if (PhysicsComponent* physics = player->getComponent<PhysicsComponent>()) {
+            physics->enabled = true;
+        }
+        if (AnimationComponent* anim = player->getComponent<AnimationComponent>()) {
+            anim->paused = false;
+        }
+        respawnPlayer();
+    }
 }
 
 
@@ -655,12 +760,25 @@ void EngineCore::resetLevelState() {
     goalMessageTimer = 0.f;
     collectedCoins = 0;
     coinBank = 0;
+    playerDying = false;
     invincible = false;
     invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;
     tilemap.resetCollectibles();
     tilemap.resetPowerups();
     setPlayerPowerState(false);
+    if (player) {
+        if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
+            movement->enabled = true;
+            movement->setCrouching(false);
+        }
+        if (PhysicsComponent* physics = player->getComponent<PhysicsComponent>()) {
+            physics->enabled = true;
+        }
+        if (AnimationComponent* anim = player->getComponent<AnimationComponent>()) {
+            anim->paused = false;
+        }
+    }
     respawnPlayer();
 
 }
@@ -695,7 +813,10 @@ void EngineCore::updatePowerupFlash(float dt) {
         const float pulse = 1.f + 0.1f * std::sin((1.f - t) * 12.f);
         const sf::Vector2f currentScale = sprite->getSprite().getScale();
         const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
-        const float baseY = poweredUp ? 1.33f : 1.f;
+        float baseY = poweredUp ? 1.33f : 1.f;
+        if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
+            baseY = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
+        }
         sprite->getSprite().setScale(
             baseX * pulse,
             baseY * pulse);
@@ -707,13 +828,16 @@ void EngineCore::updatePowerupFlash(float dt) {
             sprite->getSprite().setColor(sf::Color(255, 255, 255, 255));
             const sf::Vector2f currentScale = sprite->getSprite().getScale();
             const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
-            const float baseY = poweredUp ? 1.33f : 1.f;
+            float baseY = poweredUp ? 1.33f : 1.f;
+            if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
+                baseY = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
+            }
             sprite->getSprite().setScale(baseX, baseY);
         }
     }
 }
 void EngineCore::loseLife() {
-    if (invincible || gameOver)
+    if (invincible || gameOver || playerDying)
         return;
     lives = std::max(0, lives - 1);
     invincible = true;
@@ -732,13 +856,14 @@ void EngineCore::loseLife() {
         return;
 
     }
-    respawnPlayer();
+    startPlayerDeath();
 }
 void EngineCore::resetGameState() {
     score = 0;
     lives = 3;
     gameOver = false;
     paused = false;
+    playerDying = false;
     invincible = false;
     invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;
@@ -758,7 +883,15 @@ void EngineCore::setPlayerPowerState(bool powered) {
     SpriteComponent* sprite = player->getComponent<SpriteComponent>();
 
     const float oldHeight = movement ? movement->colliderHeight : smallColliderHeight;
-    const float newHeight = movement ? bigColliderHeight : smallColliderHeight;
+    const float baseHeight = powered ? bigColliderHeight : smallColliderHeight;
+    float newHeight = baseHeight;
+
+    if (movement) {
+        movement->standingColliderHeight = baseHeight;
+        movement->crouchColliderHeight = baseHeight * movement->crouchHeightRatio;
+        newHeight = movement->isCrouching ? movement->crouchColliderHeight : movement->standingColliderHeight;
+    }
+
     const float delta = newHeight - oldHeight;
 
     if (transform && std::abs(delta) > 0.10f) {
@@ -767,6 +900,8 @@ void EngineCore::setPlayerPowerState(bool powered) {
     }
     if (movement) {
         movement->colliderHeight = newHeight;
+        movement->standingColliderHeight = baseHeight;
+        movement->setBaseScaleY(powered ? 1.33f : 1.f);
 
     }
     if (physics) {
@@ -775,13 +910,17 @@ void EngineCore::setPlayerPowerState(bool powered) {
     }
     if (sprite) {
         const float xScale = sprite->getSprite().getScale().x;
-        const float yScale = powered ? 1.33f : 1.f;
+        float yScale = powered ? 1.33f : 1.f;
+        if (movement) {
+            yScale = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
+        }
         sprite->getSprite().setScale(xScale, yScale);
 
     }
     poweredUp = powered;
 
 }
+
 
 
         

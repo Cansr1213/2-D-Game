@@ -10,6 +10,7 @@ public:
     TransformComponent* transform;
     Tilemap* tilemap;
 
+    bool enabled = true;
     float velocityY = 0.f;
     float gravity = 900.f;
     float jumpStrength = -500.f;
@@ -35,7 +36,7 @@ public:
     }
 
     void update(float dt) override {
-        if (!transform || !tilemap) return;
+        if (!enabled || !transform || !tilemap) return;
 
         const bool jumpPressed = allowJumpInput && sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
         if (jumpPressed && !jumpHeldLastFrame) {

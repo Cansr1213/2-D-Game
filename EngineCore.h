@@ -64,6 +64,12 @@ private:
     int coinBank = 0;
     int currentWorld = 1;
     int currentLevel = 1;
+    bool playerDying = false;
+    float deathTimer = 0.f;
+    const float deathDuration = 0.9f;
+    const float deathSpinSpeed = 720.f;
+    const float deathFloatHeight = 42.f;
+    sf::Vector2f deathStartPosition{ 0.f, 0.f };
     bool inStartMenu = true;
     bool startTransition = false;
     float startTransitionTimer = 0.f;
@@ -83,7 +89,10 @@ private:
     void renderPixelatedScene();
 
     void clampCameraToLevel();
+    void clampPlayerToLevel();
     void updateCameraFollow();
+    void startPlayerDeath();
+    void updatePlayerDeath(float dt);
     void respawnPlayer();
     void resetPlayerIfFallen();
     void handleCollectibles();
