@@ -4,10 +4,24 @@
 #include "Tilemap.h"
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
+#include <vector>
+#include <string>
+
 
 
 class EngineCore {
 public:
+    enum class GameState {
+        StartMenu, 
+        WorldMap,
+        Playing
+    };
+    struct LevelInfo {
+        int world = 1;
+        int level = 1;
+        std::string file;
+
+    };
     EngineCore();
     Tilemap tilemap;
     Entity* player = nullptr;
@@ -26,6 +40,11 @@ public:
         return scene.createEntity();
     }
     sf::View camera;
+    GameState gameState = GameState::StartMenu;
+    int currentLevelIndex = 0;
+    int selectedLevelIndex = 0;
+    int maxUnlockedLevelIndex = 0;
+
 
 private:
     Window window;   // Our new window system!
@@ -44,6 +63,9 @@ private:
     sf::Text startMenuTitleText;
     sf::Text startMenuPromptText;
     sf::Text beginText;
+    sf::Text worldMapTitleText;
+    sf::Text worldMapPromptText;
+    sf::Text worldMapLevelText;
     sf::RenderTexture pixelateTexture;
     sf::Sprite pixelateSprite;
     sf::Vector2u pixelateTextureSize{ 0, 0 };
@@ -70,11 +92,11 @@ private:
     const float deathSpinSpeed = 720.f;
     const float deathFloatHeight = 42.f;
     sf::Vector2f deathStartPosition{ 0.f, 0.f };
-    bool inStartMenu = true;
     bool startTransition = false;
     float startTransitionTimer = 0.f;
     const float startTransitionDuration = 1.2f;
     const float beginTextDuration = 0.5f;
+    std::vector<LevelInfo> levels;
 
 
 
@@ -87,6 +109,13 @@ private:
     void render();
     void renderScene(sf::RenderTarget& target);
     void renderPixelatedScene();
+    void setupLevelList();
+    void loadLevel(int levelIndex);
+    void enterWorldMap();
+    void updateWorldMapText();
+    void saveProgress();
+    void loadProgress();
+
 
     void clampCameraToLevel();
     void clampPlayerToLevel();

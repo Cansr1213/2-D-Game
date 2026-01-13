@@ -37,6 +37,10 @@ public:
 			e->render(target);
 
 	}
+	void clear() {
+		entities.clear();
+
+	}
 	
 	
 private: 

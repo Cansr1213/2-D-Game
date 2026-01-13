@@ -12,6 +12,7 @@
 #include <iostream>
 #include <exception>
 #include <filesystem>   // REQUIRED for current_path()
+#include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <SFML/Graphics.hpp>
@@ -69,7 +70,7 @@ EngineCore::EngineCore()
     goalText.setFont(uiFont);
     goalText.setCharacterSize(28);
     goalText.setFillColor(sf::Color::Green);
-    
+
     gameOverText.setFont(uiFont);
     gameOverText.setCharacterSize(32);
     gameOverText.setFillColor(sf::Color::Red);
@@ -78,7 +79,7 @@ EngineCore::EngineCore()
     controlsText.setCharacterSize(16);
     controlsText.setFillColor(sf::Color(220, 220, 220));
     controlsText.setPosition(16.f, 500.f);
-    
+
     powerText.setFont(uiFont);
     powerText.setCharacterSize(20);
     powerText.setFillColor(sf::Color::White);
@@ -103,8 +104,21 @@ EngineCore::EngineCore()
     beginText.setFillColor(sf::Color::White);
     beginText.setString("Begin!");
 
+    worldMapTitleText.setFont(uiFont);
+    worldMapTitleText.setCharacterSize(36);
+    worldMapTitleText.setFillColor(sf::Color::Cyan);
+    worldMapTitleText.setString("World Mao");
 
-   
+    worldMapPromptText.setFont(uiFont);
+    worldMapPromptText.setCharacterSize(18);
+    worldMapPromptText.setFillColor(sf::Color::Yellow);
+    worldMapPromptText.setString("Use Left/Right to choose a level, Enter to play");
+
+    worldMapLevelText.setFont(uiFont);
+    worldMapLevelText.setCharacterSize(22);
+    worldMapLevelText.setFillColor(sf::Color::White);
+
+
 
     // ✅ TILEMAP MUST USE TILE TEXTURE (NOT PLAYER)
     try {
@@ -114,10 +128,8 @@ EngineCore::EngineCore()
         std::cerr << "Failed to load tile image  Assets/tileset.png (" << ex.what() << "). Falling back to Assets/platform.png\n";
         tilemap.loadTileset("Assets/platform.png", 32, 32);
     }
-    tilemap.loadFromFile("Assets/level1.txt");
-    if (tilemap.hasSpawnPoint()) {
-        playerSpawn = tilemap.getSpawnPoint();
-    }
+
+
     if (backgroundMusic.openFromFile("Assets/music.wav")) {
         backgroundMusic.setLoop(true);
         backgroundMusic.setVolume(40.f);
@@ -126,9 +138,95 @@ EngineCore::EngineCore()
     else {
         std::cerr << "Failed to load background music  Assets/music.wav\n";
     }
+    setupLevelList();
+    loadProgress();
+    currentLevelIndex = std::clamp(currentLevelIndex, 0, static_cast<int>(levels.size()) - 1);
+    selectedLevelIndex = std::clamp(selectedLevelIndex, 0, static_cast<int>(levels.size()) - 1);
+    loadLevel(currentLevelIndex);
+    updateWorldMapText();
 
+
+
+
+}
+void EngineCore::setupLevelList() {
+    levels = {
+        {1, 1, "Assets/level1.txt"},
+        {1, 2, "Assets/level2.txt"},
+        {1, 3, "Assets/level3.txt"}
+    };
+    if (levels.empty()) {
+        levels.push_back({ 1, 1, "Assets/level1.txt" });
+    }
+}
+void EngineCore::loadProgress() {
+    std::ifstream in("save.dat");
+    if (!in.is_open()) {
+        currentLevelIndex = 0;
+        selectedLevelIndex = 0;
+        maxUnlockedLevelIndex = 0;
+        return;
+
+    }
+    int current = 0;
+    int unlocked = 0;
+    in >> current >> unlocked;
+    if (!in.fail()) {
+        currentLevelIndex = std::clamp(current, 0, static_cast<int>(levels.size()) - 1);
+        maxUnlockedLevelIndex = std::clamp(unlocked, 0, static_cast<int>(levels.size()) - 1);
+        selectedLevelIndex = std::min(currentLevelIndex, maxUnlockedLevelIndex);
+
+
+    }
+}
+void EngineCore::saveProgress() {
+    std::ofstream out("save.dat", std::ios::trunc);
+    if (!out.is_open()) {
+        return;
+
+    }
+    out << currentLevelIndex << " " << maxUnlockedLevelIndex;
+
+}
+void EngineCore::updateWorldMapText() {
+    if (levels.empty()) {
+        worldMapLevelText.setString("No levels available.");
+        return;
+
+    }
+    std::string list;
+    const int maxIndex = std::min(maxUnlockedLevelIndex, static_cast<int>(levels.size()) - 1);
+    for (int i = 0; i < static_cast<int>(levels.size()); ++i) {
+        const bool locked = i > maxIndex;
+        const bool selected = i == selectedLevelIndex;
+        const auto& levelInfo = levels[i];
+        list += selected ? "> " : " ";
+        list += std::to_string(levelInfo.world) + "-" + std::to_string(levelInfo.level);
+        if (locked) {
+            list += " (Locked)";
+
+        }
+        list += "\n";
+
+    }
+    worldMapLevelText.setString(list);
+}
+void EngineCore::loadLevel(int levelIndex) {
+    if (levels.empty()) {
+        return;
+    }
+    const int safeIndex = std::clamp(levelIndex, 0, static_cast<int>(levels.size()) - 1);
+    currentLevelIndex = safeIndex;
+    selectedLevelIndex = safeIndex;
+    currentWorld = levels[safeIndex].world;
+    currentLevel = levels[safeIndex].level;
+    tilemap.loadFromFile(levels[safeIndex].file);
+    if (tilemap.hasSpawnPoint()) {
+        playerSpawn = tilemap.getSpawnPoint();
+
+    }
+    scene.clear();
     
-    // ✅ CREATE ONE PLAYER ENTITY
     player = scene.createEntity();
 
     TransformComponent* transform = player->addComponent<TransformComponent>(playerSpawn.x, playerSpawn.y);
@@ -152,11 +250,21 @@ EngineCore::EngineCore()
         goomba->addComponent<EnemyComponent>(goombaTransform, &tilemap, 32.f, 32.f);
         goomba->addComponent<AnimationComponent>(goombaSprite, 47, 0, 6, 0.20f);
     }
-
-
-
-
-
+    levelComplete = false;
+    goalMessageTimer = 0.f;
+    collectedCoins = 0;
+    playerDying = false;
+    invincible = false;
+    invincibilityTimer = false;
+    powerupFlashTimer = 0.f;
+    tilemap.resetCollectibles();
+    tilemap.resetPowerups();
+    setPlayerPowerState(false);
+    respawnPlayer();
+}
+void EngineCore::enterWorldMap() {
+    gameState = GameState::WorldMap;
+    updateWorldMapText();
 
 }
 
@@ -182,17 +290,36 @@ void EngineCore::processEvents() {
         }
     if (event.type == sf::Event::KeyPressed) {
         if (event.key.code == sf::Keyboard::Escape) {
-                window.close();
+            window.close();
 
         }
-        if (inStartMenu && !startTransition && event.key.code == sf::Keyboard::Enter) {
+        if (gameState == GameState::StartMenu && !startTransition && event.key.code == sf::Keyboard::Enter) {
             startTransition = true;
             startTransitionTimer = startTransitionDuration;
            
             resetGameState();
 
         }
-        if (!inStartMenu && event.key.code == sf::Keyboard::P) {
+        if (gameState == GameState::WorldMap) {
+            if (event.key.code == sf::Keyboard::Left) {
+                selectedLevelIndex = std::max(0, selectedLevelIndex - 1);
+                updateWorldMapText();
+
+            }
+            if (event.key.code == sf::Keyboard::Right) {
+                const int maxIndex = std::min(maxUnlockedLevelIndex, static_cast<int>(levels.size()) - 1);
+                selectedLevelIndex = std::min(maxIndex, selectedLevelIndex + 1);
+                updateWorldMapText();
+            }
+            if (event.key.code == sf::Keyboard::Enter) {
+                if (selectedLevelIndex <= maxUnlockedLevelIndex) {
+                    loadLevel(selectedLevelIndex);
+                    gameState = GameState::Playing;
+                    paused = false;
+                }
+            }
+        }
+        if (gameState == GameState::Playing && event.key.code == sf::Keyboard::P) {
             paused = !paused;
             std::cout << (!paused ? "Game paused\n" : "Game continue\n");
 
@@ -207,7 +334,7 @@ void EngineCore::processEvents() {
 void EngineCore::update(float dt) {
    
     // -- CAMERA FOLLOW LOGIC -- //
-    if (inStartMenu) {
+    if (gameState == GameState::StartMenu) {
         if (player) {
             if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
                 sprite->setVisible(false);
@@ -216,9 +343,17 @@ void EngineCore::update(float dt) {
         if (startTransition) {
             startTransitionTimer = std::max(0.f, startTransitionTimer - dt);
             if (startTransitionTimer <= 0.f) {
-                inStartMenu = false;
                 startTransition = false;
 
+                enterWorldMap();
+            }
+        }
+        return;
+    }
+    if (gameState == GameState::WorldMap) {
+        if (player) {
+            if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
+                sprite->setVisible(false);
             }
         }
         return;
@@ -278,7 +413,15 @@ void EngineCore::update(float dt) {
     if (levelComplete) {
         goalMessageTimer -= dt;
         if (goalMessageTimer <= 0.f) {
-            resetLevelState();
+            const int nextIndex = currentLevelIndex + 1;
+            if (nextIndex < static_cast<int>(levels.size())) {
+                maxUnlockedLevelIndex = std::max(maxUnlockedLevelIndex, nextIndex);
+                currentLevelIndex = nextIndex;
+                selectedLevelIndex = currentLevelIndex;
+            }
+            saveProgress();
+            enterWorldMap();
+
 
         }
     }
@@ -291,18 +434,21 @@ void EngineCore::render() {
     window.beginDraw();
 
     // Camera view
-    if (inStartMenu && startTransition) {
+    if (gameState == GameState::StartMenu && startTransition) {
         renderPixelatedScene();
     }
-    else {
+    else if (gameState == GameState::Playing) {
         renderScene(window.getRenderWindow());
+    }
+    else {
+        window.getRenderWindow().clear(sf::Color::Black);
     }
 
     // Draw tilemap BEFORE entities 
     window.getRenderWindow().setView(window.getRenderWindow().getDefaultView());
 
     // Draw entities
-    if (!inStartMenu) {
+    if (gameState == GameState::Playing) {
         livesText.setString("Lives: " + std::to_string(lives));
         coinText.setString("Coins: " + std::to_string(coinBank));
         scoreText.setString("Score: " + std::to_string(score));
@@ -339,7 +485,18 @@ void EngineCore::render() {
         }
     }
 
-    if (inStartMenu && !startTransition) {
+    if (gameState == GameState::WorldMap) {
+        const sf::Vector2u menuSize = window.getRenderWindow().getSize();
+        const sf::FloatRect titleBounds = worldMapTitleText.getLocalBounds();
+        worldMapTitleText.setOrigin(titleBounds.left + titleBounds.width / 2.f, titleBounds.top + titleBounds.height / 2.f);
+        worldMapTitleText.setPosition(static_cast<float>(menuSize.x) / 2.f, 160.f);
+        worldMapPromptText.setPosition(120.f, 240.f);
+        worldMapLevelText.setPosition(160.f, 280.f);
+        window.getRenderWindow().draw(worldMapTitleText);
+        window.getRenderWindow().draw(worldMapPromptText);
+        window.getRenderWindow().draw(worldMapLevelText);
+    }
+    if (gameState == GameState::StartMenu && !startTransition) {
         const sf::FloatRect titleBounds = startMenuTitleText.getLocalBounds();
         const sf::FloatRect promptBounds = startMenuPromptText.getLocalBounds();
         const sf::Vector2u menuSize = window.getRenderWindow().getSize();
@@ -867,7 +1024,11 @@ void EngineCore::resetGameState() {
     invincible = false;
     invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;
-    resetLevelState();
+    currentLevelIndex = 0;
+    maxUnlockedLevelIndex = 0;
+    selectedLevelIndex = 0;
+    saveProgress();
+    loadLevel(currentLevelIndex);
 }
 
 void EngineCore::setPlayerPowerState(bool powered) {
