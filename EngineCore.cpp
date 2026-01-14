@@ -85,6 +85,11 @@ EngineCore::EngineCore()
     powerText.setFillColor(sf::Color::White);
     powerText.setPosition(16.f, 66.f);
 
+    reserveText.setFont(uiFont);
+    reserveText.setCharacterSize(18);
+    reserveText.setFillColor(sf::Color::White);
+    reserveText.setPosition(16.f, 92.f);
+
     levelText.setFont(uiFont);
     levelText.setCharacterSize(20);
     levelText.setFillColor(sf::Color::White);
@@ -107,7 +112,7 @@ EngineCore::EngineCore()
     worldMapTitleText.setFont(uiFont);
     worldMapTitleText.setCharacterSize(36);
     worldMapTitleText.setFillColor(sf::Color::Cyan);
-    worldMapTitleText.setString("World Mao");
+    worldMapTitleText.setString("World Map");
 
     worldMapPromptText.setFont(uiFont);
     worldMapPromptText.setCharacterSize(18);
@@ -259,7 +264,8 @@ void EngineCore::loadLevel(int levelIndex) {
     powerupFlashTimer = 0.f;
     tilemap.resetCollectibles();
     tilemap.resetPowerups();
-    setPlayerPowerState(false);
+    reservePowerup.reset();
+    setPlayerPowerState(PlayerPowerState::Small);
     respawnPlayer();
 }
 void EngineCore::enterWorldMap() {
@@ -390,6 +396,12 @@ void EngineCore::update(float dt) {
         return;
 
     }
+    const bool reservePressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Q);
+    if (reservePressed && !reserveHeld) {
+        handleReserveActivation();
+    }
+    reserveHeld = reservePressed;
+
     tilemap.update(dt);
 	updateInvincibility(dt);
     updatePowerupFlash(dt);
@@ -406,6 +418,7 @@ void EngineCore::update(float dt) {
     handlePowerups();
     checkGoalReached();
     scene.update(dt);
+    applyGlidePhysics();
     clampPlayerToLevel();
     updateCameraFollow();
     clampCameraToLevel();
@@ -471,9 +484,12 @@ void EngineCore::render() {
         window.getRenderWindow().draw(livesText);
         window.getRenderWindow().draw(pauseText);
         window.getRenderWindow().draw(levelText);
-        powerText.setString(poweredUp ? "Power: Super" : "Power: Small");
+        powerText.setString("Power: " + toPowerupLabel(currentPowerState));
+        const std::string reserveLabel = reservePowerup ? toPowerupLabel(*reservePowerup) : "Empty";
+        reserveText.setString("Reserve (Q): " + reserveLabel);
         window.getRenderWindow().draw(powerText);
-        controlsText.setString("Move: A/D Jump: Space Run: Shift Reset: R Pause: P");
+        window.getRenderWindow().draw(reserveText);
+        controlsText.setString("Move: A/D Jump: Space Run: Shift Reserve: Q Reset: R Pause: P");
         window.getRenderWindow().draw(controlsText);
 
         if (gameOver) {
@@ -781,11 +797,12 @@ void EngineCore::handlePowerups() {
 
     const sf::FloatRect bounds(transform->position.x, transform->position.y, width, height);
 
-    const int collectedNow = tilemap.collectPowerupIfOverlapping(bounds);
-    if (collectedNow > 0) {
-        setPlayerPowerState(true);
+    const auto collected = tilemap.collectPowerupIfOverlapping(bounds);
+    if(collected) {
+        applyPowerupPickup(*collected);
+
         powerupFlashTimer = powerupFlashDuration;
-        score += collectedNow * powerupScoreValue;
+        score += powerupScoreValue;
     }
 }
 
@@ -899,8 +916,8 @@ void EngineCore::handleEnemyCollisions() {
 
         }
         else {
-            if (poweredUp) {
-                setPlayerPowerState(false);
+            if (isPoweredState(currentPowerState)) {
+                setPlayerPowerState(PlayerPowerState::Small);
                 invincible = true;
                 invincibilityTimer = invincibilityDuration;
 
@@ -923,7 +940,8 @@ void EngineCore::resetLevelState() {
     powerupFlashTimer = 0.f;
     tilemap.resetCollectibles();
     tilemap.resetPowerups();
-    setPlayerPowerState(false);
+    reservePowerup.reset();
+    setPlayerPowerState(PlayerPowerState::Small);
     if (player) {
         if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
             movement->enabled = true;
@@ -970,7 +988,7 @@ void EngineCore::updatePowerupFlash(float dt) {
         const float pulse = 1.f + 0.1f * std::sin((1.f - t) * 12.f);
         const sf::Vector2f currentScale = sprite->getSprite().getScale();
         const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
-        float baseY = poweredUp ? 1.33f : 1.f;
+        float baseY = isPoweredState(currentPowerState) ? 1.33f : 1.f;
         if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
             baseY = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
         }
@@ -985,7 +1003,7 @@ void EngineCore::updatePowerupFlash(float dt) {
             sprite->getSprite().setColor(sf::Color(255, 255, 255, 255));
             const sf::Vector2f currentScale = sprite->getSprite().getScale();
             const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
-            float baseY = poweredUp ? 1.33f : 1.f;
+            float baseY = isPoweredState(currentPowerState) ? 1.33f : 1.f;
             if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
                 baseY = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
             }
@@ -1027,15 +1045,16 @@ void EngineCore::resetGameState() {
     currentLevelIndex = 0;
     maxUnlockedLevelIndex = 0;
     selectedLevelIndex = 0;
+    reservePowerup.reset();
     saveProgress();
-    loadLevel(currentLevelIndex);
+    loadLevel(currentLevelIndex); 
 }
 
-void EngineCore::setPlayerPowerState(bool powered) {
+void EngineCore::setPlayerPowerState(PlayerPowerState powerState) {
     if (!player)
         return;
 
-    if (poweredUp == powered)
+    if (currentPowerState == powerState)
         return;
 
     TransformComponent* transform = player->getComponent<TransformComponent>();
@@ -1044,6 +1063,7 @@ void EngineCore::setPlayerPowerState(bool powered) {
     SpriteComponent* sprite = player->getComponent<SpriteComponent>();
 
     const float oldHeight = movement ? movement->colliderHeight : smallColliderHeight;
+    const float powered = isPoweredState(powerState);
     const float baseHeight = powered ? bigColliderHeight : smallColliderHeight;
     float newHeight = baseHeight;
 
@@ -1078,10 +1098,141 @@ void EngineCore::setPlayerPowerState(bool powered) {
         sprite->getSprite().setScale(xScale, yScale);
 
     }
-    poweredUp = powered;
+    currentPowerState = powerState;
+    applyPowerupMovementModifiers();
 
 }
 
+void EngineCore::handleReserveActivation() {
+    if (!reservePowerup) {
+        return;
+    }
+    setPlayerPowerState(*reservePowerup);
+    reservePowerup.reset();
+    powerupFlashTimer = powerupFlashDuration;
+}
 
+void EngineCore::applyPowerupPickup(Tilemap::PowerupType powerupType) {
+    const PlayerPowerState newState = toPlayerPowerState(powerupType);
+    if (isPoweredState(currentPowerState)) {
+        reservePowerup = newState;
+        return;
+    }
+    setPlayerPowerState(newState);
+}
 
-        
+void EngineCore::applyPowerupMovementModifiers() {
+    if (!player) {
+        return;
+    }
+    MovementComponent* movement = player->getComponent<MovementComponent>();
+    PhysicsComponent* physics = player->getComponent<PhysicsComponent>();
+
+    if (movement) {
+        movement->walkSpeed = baseWalkSpeed;
+        movement->runSpeed = baseRunSpeed;
+        movement->crouchSpeed = baseCrouchSpeed;
+    }
+    if (physics) {
+        physics->gravity = baseGravity;
+        physics->jumpStrength = baseJumpStrength;
+    }
+
+    switch (currentPowerState) {
+    case PlayerPowerState::SuperLeaf:
+    case PlayerPowerState::TanookiSuit:
+        if (movement) {
+            movement->runSpeed = baseRunSpeed * 1.1f;
+        }
+        if (physics) {
+            physics->gravity = baseGravity * 0.85f;
+            physics->jumpStrength = baseJumpStrength * 1.12f;
+        }
+        break;
+    case PlayerPowerState::FrogSuit:
+        if (movement) {
+            movement->walkSpeed = baseWalkSpeed * 0.8f;
+            movement->runSpeed = baseRunSpeed * 0.8f;
+        }
+        if (physics) {
+            physics->gravity = baseGravity * 0.75f;
+            physics->jumpStrength = baseJumpStrength * 1.05f;
+        }
+        break;
+    case PlayerPowerState::HammerSuit:
+        if (movement) {
+            movement->runSpeed = baseRunSpeed * 0.9f;
+        }
+        if (physics) {
+            physics->gravity = baseGravity * 1.1f;
+            physics->jumpStrength = baseJumpStrength * 0.9f;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+void EngineCore::applyGlidePhysics() {
+    if (!player) {
+        return;
+    }
+    if (currentPowerState != PlayerPowerState::SuperLeaf
+        && currentPowerState != PlayerPowerState::TanookiSuit) {
+        return;
+    }
+    PhysicsComponent* physics = player->getComponent<PhysicsComponent>();
+    if (!physics || physics->onGround) {
+        return;
+    }
+    const bool glideHeld = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
+    if (!glideHeld || physics->velocityY <= 0.f) {
+        return;
+    }
+    const float glideFallSpeed = 220.f;
+    physics->velocityY = std::min(physics->velocityY, glideFallSpeed);
+}
+
+EngineCore::PlayerPowerState EngineCore::toPlayerPowerState(Tilemap::PowerupType powerupType) {
+    switch (powerupType) {
+    case Tilemap::PowerupType::FireFlower:
+        return PlayerPowerState::FireFlower;
+    case Tilemap::PowerupType::SuperLeaf:
+        return PlayerPowerState::SuperLeaf;
+    case Tilemap::PowerupType::TanookiSuit:
+        return PlayerPowerState::TanookiSuit;
+    case Tilemap::PowerupType::HammerSuit:
+        return PlayerPowerState::HammerSuit;
+    case Tilemap::PowerupType::FrogSuit:
+        return PlayerPowerState::FrogSuit;
+    case Tilemap::PowerupType::SuperMushroom:
+    default:
+        return PlayerPowerState::SuperMushroom;
+    }
+}
+
+std::string EngineCore::toPowerupLabel(PlayerPowerState powerState) {
+    switch (powerState) {
+    case PlayerPowerState::Small:
+        return "Small";
+    case PlayerPowerState::SuperMushroom:
+        return "Super";
+    case PlayerPowerState::FireFlower:
+        return "Fire Flower";
+    case PlayerPowerState::SuperLeaf:
+        return "Super Leaf";
+    case PlayerPowerState::TanookiSuit:
+        return "Tanooki Suit";
+    case PlayerPowerState::HammerSuit:
+        return "Hammer Suit";
+    case PlayerPowerState::FrogSuit:
+        return "Frog Suit";
+    default:
+        return "Unknown";
+    }
+}
+
+bool EngineCore::isPoweredState(PlayerPowerState powerState) {
+    return powerState != PlayerPowerState::Small;
+}
+

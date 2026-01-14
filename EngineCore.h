@@ -6,6 +6,7 @@
 #include <SFML/Audio.hpp>
 #include <vector>
 #include <string>
+#include <optional>
 
 
 
@@ -22,6 +23,15 @@ public:
         std::string file;
 
     };
+    enum class PlayerPowerState {
+        Small, 
+        SuperMushroom,
+        FireFlower, 
+        SuperLeaf,
+        TanookiSuit, 
+        HammerSuit,
+        FrogSuit
+    };
     EngineCore();
     Tilemap tilemap;
     Entity* player = nullptr;
@@ -34,6 +44,7 @@ public:
     bool pausedHeld = false;
     bool paused = false;
     bool gameOver = false;
+    bool reserveHeld = false;
     void run();
 
     Entity* CreateEntity() {
@@ -59,6 +70,7 @@ private:
     sf::Text gameOverText;
     sf::Text controlsText;
     sf::Text powerText;
+    sf::Text reserveText;
     sf::Text levelText;
     sf::Text startMenuTitleText;
     sf::Text startMenuPromptText;
@@ -75,12 +87,18 @@ private:
     bool invincible = false;
 	float invincibilityTimer = 0.f;
 	const float invincibilityDuration = 1.5f;
-    bool poweredUp = false;
+    PlayerPowerState currentPowerState = PlayerPowerState::Small;
+    std::optional<PlayerPowerState> reservePowerup;
     const int coinScoreValue = 100;
     const int goalScoreValue = 500;
     const int powerupScoreValue = 1000;
     const float smallColliderHeight = 48.f;
     const float bigColliderHeight = 64.f;
+    const float baseWalkSpeed = 180.f;
+    const float baseRunSpeed = 260.f;
+    const float baseCrouchSpeed = 90.f;
+    const float baseGravity = 900.f;
+    const float baseJumpStrength = -500.f;
     float powerupFlashTimer = 0.f;
     float powerupFlashDuration = 0.35f;
     int coinBank = 0;
@@ -126,6 +144,7 @@ private:
     void resetPlayerIfFallen();
     void handleCollectibles();
     void handlePowerups();
+    void handleReserveActivation();
     void checkGoalReached();
     void handleEnemyCollisions();
     void updateInvincibility(float dt);
@@ -133,7 +152,13 @@ private:
     void loseLife();
     void resetLevelState();
     void resetGameState();
-    void setPlayerPowerState(bool powered);
+    void setPlayerPowerState(PlayerPowerState powerState);
+    void applyPowerupPickup(Tilemap::PowerupType powerupType);
+    void applyPowerupMovementModifiers();
+    void applyGlidePhysics();
+    static PlayerPowerState toPlayerPowerState(Tilemap::PowerupType powerupType);
+    static std::string toPowerupLabel(PlayerPowerState powerState);
+    static bool isPoweredState(PlayerPowerState powerState);
 
 
 

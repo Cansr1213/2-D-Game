@@ -5,14 +5,37 @@
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cctype>
 #include <iostream>
-
+#include <optional>
 
 
 class Tilemap {
 public:
+    enum class PowerupType {
+        SuperMushroom,
+        FireFlower,
+        SuperLeaf,
+        TanookiSuit,
+        HammerSuit,
+        FrogSuit
+    };
+
+    struct PowerupPickup {
+        sf::Vector2f position;
+        PowerupType type;
+        bool collected = false;
+    };
+
+    struct PowerupVisual {
+        sf::Texture texture;
+        bool loaded = false;
+        sf::Vector2i size{ 0, 0 };
+        float scaleX = 1.f;
+        float scaleY = 1.f;
+    };
     int tileSize = 32;
     int tileSourceWidth = 32;
     int tileSourceHeight = 32;
@@ -27,8 +50,8 @@ public:
     std::vector<sf::Vector2i> goalTiles;
     std::vector<sf::Vector2f> collectibles;
     std::vector<bool> collectibleCollected;
-    std::vector<sf::Vector2f> powerups;
-    std::vector<bool> powerupCollected;
+    std::vector<PowerupPickup> powerups;
+   
 
 
     sf::Texture tilesetTexture;
@@ -36,6 +59,9 @@ public:
     sf::Texture powerupTexture;
     sf::Sprite powerupSprite;
     bool powerupTextureLoaded = false;
+    int powerupTextureColumns = 1;
+    int powerupTextureRows = 1;
+    sf::Vector2i powerupFrameSize{ 0, 0 };
     float powerupAnimTime = 0.f;
     float powerupBobAmplitude = 5.f;
     float powerupBobSpeed = 2.2f;
@@ -43,7 +69,7 @@ public:
     float powerupBaseScaleX = 1.f;
     float powerupBaseScaleY = 1.f;
     bool warnedInvalidTileIndex = false;
-
+    std::array<PowerupVisual, 6> powerupVisuals;
     Tilemap() = default;
 
 
@@ -81,19 +107,9 @@ public:
         std::cout << "Loaded tileset " << path << " (" << textureSize.x << "x" << textureSize.y
             << "), tile source " << tileSourceWidth << "x" << tileSourceHeight
             << ", grid " << tilesetColumns << "x" << tilesetRows << ".\n";
-        powerupTextureLoaded = powerupTexture.loadFromFile("Assets/powerup.png");
-        if (powerupTextureLoaded) {
-            powerupSprite.setTexture(powerupTexture);
-            powerupSprite.setOrigin(
-                static_cast<float>(powerupTexture.getSize().x) / 2.f,
-                static_cast<float>(powerupTexture.getSize().y) / 2.f);
-            const float targetSize = static_cast<float>(tileSize) * 1.5f;
-            const float scaleX = targetSize / static_cast<float>(powerupTexture.getSize().x);
-            const float scaleY = targetSize / static_cast<float>(powerupTexture.getSize().y);
-
-            powerupSprite.setScale(scaleX, scaleY);
-            powerupBaseScaleX = scaleX;
-            powerupBaseScaleY = scaleY;
+        powerupTextureLoaded = loadPowerupTexture("Assets/powerups.png", 3, 2);
+        if (!powerupTextureLoaded) {
+            powerupTextureLoaded = loadPowerupTexture("Assets/powerup.png", 1, 1);
 
         }
     }
@@ -134,7 +150,7 @@ public:
         collectibles.clear();
         collectibleCollected.clear();
         powerups.clear();
-        powerupCollected.clear();
+       
 
 
 
@@ -171,8 +187,42 @@ public:
                 case 'm': {
                     const float worldX = static_cast<float>(x * tileSize + tileSize / 2);
                     const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
-                    powerups.emplace_back(worldX, worldY);
-                    powerupCollected.push_back(false);
+                    powerups.push_back({ sf::Vector2f(worldX, worldY), PowerupType::SuperMushroom, false });
+                    break;
+                }
+                case'F':
+                case 'f': {
+                    const float worldX = static_cast<float>(x * tileSize + tileSize / 2);
+                    const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
+                    powerups.push_back({ sf::Vector2f(worldX, worldY), PowerupType::FireFlower, false });
+                    break;
+                }
+                case 'L':
+                case 'l': {
+                    const float worldX = static_cast<float>(x * tileSize + tileSize / 2);
+                    const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
+                    powerups.push_back({ sf::Vector2f(worldX, worldY), PowerupType::SuperLeaf, false });
+                    break;
+                }
+                case 'T':
+                case 't': {
+                    const float worldX = static_cast<float>(x * tileSize + tileSize / 2);
+                    const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
+                    powerups.push_back({ sf::Vector2f(worldX, worldY), PowerupType::TanookiSuit, false });
+                    break;
+                }
+                case 'H':
+                case 'h': {
+                    const float worldX = static_cast<float>(x * tileSize + tileSize / 2);
+                    const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
+                    powerups.push_back({ sf::Vector2f(worldX, worldY), PowerupType::HammerSuit, false });
+                    break;
+                }
+                case 'R':
+                case 'r': {
+                    const float worldX = static_cast<float>(x * tileSize + tileSize / 2);
+                    const float worldY = static_cast<float>(y * tileSize + tileSize / 2);
+                    powerups.push_back({ sf::Vector2f(worldX, worldY), PowerupType::FrogSuit, false });
                     break;
                 }
                 default:
@@ -239,18 +289,38 @@ public:
             coinShape.setPosition(collectibles[i]);
             target.draw(coinShape);
         }
-        if (powerupTextureLoaded) {
+        if (powerupTextureLoaded || hasAnyIndividualPowerups()) {
             for (std::size_t i = 0; i < powerups.size(); ++i) {
-                if (i < powerupCollected.size() && powerupCollected[i])
+                if (powerups[i].collected)
                     continue;
 
                 const float bobOffset = std::sin(powerupAnimTime * powerupBobSpeed + static_cast<float>(i) * 0.6f) * powerupBobAmplitude;
                 const float pulse = 1.f + 0.08f * std::sin(powerupAnimTime * powerupPulseSpeed + static_cast<float>(i));
-                powerupSprite.setScale(powerupBaseScaleX * pulse, powerupBaseScaleY * pulse);
+                
                 const float glow = 0.8f + 0.2f * std::sin(powerupAnimTime * powerupPulseSpeed + static_cast<float>(i) * 1.4f);
                 const sf::Uint8 alpha = static_cast<sf::Uint8>(200 + 55 * glow);
-                powerupSprite.setColor(sf::Color(255, 255, 255, alpha));
-                powerupSprite.setPosition(sf::Vector2f(powerups[i].x, powerups[i].y + bobOffset));
+                const PowerupVisual* visual = getPowerupVisual(powerups[i].type);
+                if (visual && visual->loaded) {
+                    powerupSprite.setTexture(visual->texture, true);
+                    powerupSprite.setTextureRect(sf::IntRect(0, 0, visual->size.x, visual->size.y));
+                    powerupSprite.setOrigin(static_cast<float>(visual->size.x) / 2.f, static_cast<float>(visual->size.y) / 2.f);
+                    powerupSprite.setScale(visual->scaleX * pulse, visual->scaleY * pulse);
+                    powerupSprite.setColor(sf::Color(255, 255, 255, alpha));
+                }
+                else if (powerupTextureLoaded) {
+                    powerupSprite.setTexture(powerupTexture, true);
+                    powerupSprite.setTextureRect(getPowerupTextureRect(powerups[i].type));
+                    powerupSprite.setOrigin(
+                        static_cast<float>(powerupFrameSize.x) / 2.f,
+                        static_cast<float>(powerupFrameSize.y) / 2.f);
+                    powerupSprite.setScale(powerupBaseScaleX * pulse, powerupBaseScaleY * pulse);
+                    powerupSprite.setColor(getPowerupTint(powerups[i].type, alpha));
+                }
+                else {
+                    continue;
+                }
+                powerupSprite.setPosition(sf::Vector2f(powerups[i].position.x, powerups[i].position.y + bobOffset));
+                
 
 
                 target.draw(powerupSprite);
@@ -258,13 +328,14 @@ public:
         }
         else {
             sf::RectangleShape powerupShape(sf::Vector2f(static_cast<float>(tileSize) * 0.8f, static_cast<float>(tileSize) * 0.8f));
-            powerupShape.setFillColor(sf::Color(220, 80, 80));
             powerupShape.setOrigin(powerupShape.getSize() / 2.f);
             for (std::size_t i = 0; i < powerups.size(); ++i) {
-                if (i < powerupCollected.size() && powerupCollected[i])
+                if (powerups[i].collected)
                     continue;
 
-                powerupShape.setPosition(powerups[i]);
+                
+                powerupShape.setFillColor(getPowerupTint(powerups[i].type, 255));
+                powerupShape.setPosition(powerups[i].position);
                 target.draw(powerupShape);
             }
         
@@ -338,7 +409,9 @@ public:
         return static_cast<int>(powerups.size());
     }
     void resetPowerups() {
-        powerupCollected.assign(powerupCollected.size(), false);
+        for (auto& powerup : powerups) {
+            powerup.collected = false;
+        }
     }
 
     int getCollectedCount() const {
@@ -363,18 +436,18 @@ public:
         }
         return collectedCount;
     }
-    int collectPowerupIfOverlapping(const sf::FloatRect& bounds) {
-        int collectedCount = 0;
-        for (std::size_t i = 0; i < powerups.size() && i < powerupCollected.size(); ++i) {
-            if (powerupCollected[i])
+    std::optional<PowerupType> collectPowerupIfOverlapping(const sf::FloatRect& bounds){
+        for (auto& powerup : powerups) {
+            if (powerup.collected)
                 continue;
-            if (bounds.contains(powerups[i])) {
-                powerupCollected[i] = true;
-                ++collectedCount;
+            if (bounds.contains(powerup.position)) {
+                powerup.collected = true;
+                return powerup.type;
+                
 
             }
         }
-        return collectedCount;
+        return std::nullopt;
     }
 
     bool reachedGoal(const sf::FloatRect& bounds) const {
@@ -391,6 +464,195 @@ public:
         return false;
     }
     private:
+        static constexpr int powerupTypeCount = 6;
+
+        bool loadIndividualPowerups() {
+            bool anyLoaded = false;
+            for (int i = 0; i < powerupTypeCount; ++i) {
+                const PowerupType type = static_cast<PowerupType>(i);
+                anyLoaded = loadPowerupTextureForType(type) || anyLoaded;
+            }
+            return anyLoaded;
+        }
+
+        bool loadPowerupTextureForType(PowerupType type) {
+            const std::vector<std::string> candidates = getPowerupTextureCandidates(type);
+            for (const auto& path : candidates) {
+                if (tryLoadPowerupTexture(type, path)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool tryLoadPowerupTexture(PowerupType type, const std::string& path) {
+            PowerupVisual& visual = powerupVisuals[powerupIndex(type)];
+            if (!visual.texture.loadFromFile(path)) {
+                return false;
+            }
+            const auto textureSize = visual.texture.getSize();
+            visual.size = sf::Vector2i(
+                static_cast<int>(textureSize.x),
+                static_cast<int>(textureSize.y));
+            if (visual.size.x <= 0 || visual.size.y <= 0) {
+                return false;
+            }
+            const float targetSize = static_cast<float>(tileSize) * 1.5f;
+            visual.scaleX = targetSize / static_cast<float>(visual.size.x);
+            visual.scaleY = targetSize / static_cast<float>(visual.size.y);
+            visual.loaded = true;
+            return true;
+        }
+
+        bool hasAnyIndividualPowerups() const {
+            for (const auto& visual : powerupVisuals) {
+                if (visual.loaded) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        const PowerupVisual* getPowerupVisual(PowerupType type) const {
+            const PowerupVisual& visual = powerupVisuals[powerupIndex(type)];
+            return visual.loaded ? &visual : nullptr;
+        }
+
+        static std::vector<std::string> getPowerupTextureCandidates(PowerupType type) {
+            const std::string filename = getPowerupFilename(type);
+            const std::string legacyName = getPowerupLegacyBasename(type);
+            return {
+                "Assets/powerups/" + filename,
+                "Assets/" + filename,
+                "Assets/powerup_" + filename,
+                "Assets/powerup_" + legacyName + ".png",
+                "Assets/" + legacyName + ".png"
+            };
+        }
+
+        static std::string getPowerupBasename(PowerupType type) {
+            switch (type) {
+            case PowerupType::SuperMushroom:
+                return "Magicmushroom";
+            case PowerupType::FireFlower:
+                return "Fireflower";
+            case PowerupType::SuperLeaf:
+                return "Superlead";
+            case PowerupType::TanookiSuit:
+                return "Tanookisuit";
+            case PowerupType::HammerSuit:
+                return "Hammersuit";
+            case PowerupType::FrogSuit:
+                return "Frogsuit";
+            default:
+                return "powerup";
+            }
+        }
+
+        static std::string getPowerupFilename(PowerupType type) {
+            return getPowerupBasename(type) + ".png";
+        }
+
+        static std::string getPowerupLegacyBasename(PowerupType type) {
+            switch (type) {
+            case PowerupType::SuperMushroom:
+                return "super_mushroom";
+            case PowerupType::FireFlower:
+                return "fire_flower";
+            case PowerupType::SuperLeaf:
+                return "super_leaf";
+            case PowerupType::TanookiSuit:
+                return "tanooki_suit";
+            case PowerupType::HammerSuit:
+                return "hammer_suit";
+            case PowerupType::FrogSuit:
+                return "frog_suit";
+            default:
+                return "powerup";
+            }
+        }
+
+        static std::size_t powerupIndex(PowerupType type) {
+            return static_cast<std::size_t>(type);
+        }
+
+        bool loadPowerupTexture(const std::string& path, int columns, int rows) {
+            if (!powerupTexture.loadFromFile(path)) {
+                return false;
+            }
+            powerupTextureColumns = std::max(1, columns);
+            powerupTextureRows = std::max(1, rows);
+            const auto textureSize = powerupTexture.getSize();
+            powerupFrameSize = sf::Vector2i(
+                static_cast<int>(textureSize.x) / powerupTextureColumns,
+                static_cast<int>(textureSize.y) / powerupTextureRows);
+            if (powerupFrameSize.x <= 0 || powerupFrameSize.y <= 0) {
+                return false;
+            }
+            powerupSprite.setTexture(powerupTexture);
+            powerupSprite.setOrigin(
+                static_cast<float>(powerupFrameSize.x) / 2.f,
+                static_cast<float>(powerupFrameSize.y) / 2.f);
+            const float targetSize = static_cast<float>(tileSize) * 1.5f;
+            const float scaleX = targetSize / static_cast<float>(powerupFrameSize.x);
+            const float scaleY = targetSize / static_cast<float>(powerupFrameSize.y);
+
+            powerupSprite.setScale(scaleX, scaleY);
+            powerupBaseScaleX = scaleX;
+            powerupBaseScaleY = scaleY;
+            return true;
+        }
+
+        sf::IntRect getPowerupTextureRect(PowerupType type) const {
+            int index = 0;
+            switch (type) {
+            case PowerupType::FireFlower:
+                index = 1;
+                break;
+            case PowerupType::SuperLeaf:
+                index = 2;
+                break;
+            case PowerupType::TanookiSuit:
+                index = 3;
+                break;
+            case PowerupType::HammerSuit:
+                index = 4;
+                break;
+            case PowerupType::FrogSuit:
+                index = 5;
+                break;
+            case PowerupType::SuperMushroom:
+            default:
+                index = 0;
+                break;
+            }
+            const int column = powerupTextureColumns > 0 ? index % powerupTextureColumns : 0;
+            const int row = powerupTextureColumns > 0 ? index / powerupTextureColumns : 0;
+            return sf::IntRect(
+                column * powerupFrameSize.x,
+                row * powerupFrameSize.y,
+                powerupFrameSize.x,
+                powerupFrameSize.y);
+        }
+
+        static sf::Color getPowerupTint(PowerupType type, sf::Uint8 alpha) {
+            switch (type) {
+            case PowerupType::SuperMushroom:
+                return sf::Color(255, 70, 70, alpha);
+            case PowerupType::FireFlower:
+                return sf::Color(255, 150, 60, alpha);
+            case PowerupType::SuperLeaf:
+                return sf::Color(255, 200, 100, alpha);
+            case PowerupType::TanookiSuit:
+                return sf::Color(160, 120, 90, alpha);
+            case PowerupType::HammerSuit:
+                return sf::Color(160, 160, 170, alpha);
+            case PowerupType::FrogSuit:
+                return sf::Color(80, 200, 120, alpha);
+            default:
+                return sf::Color(220, 80, 80, alpha);
+            }
+        }
         static int tileIndexFromChar(char c) {
             if (std::isdigit(static_cast<unsigned char>(c))) {
                 return c - '0';
