@@ -41,6 +41,15 @@ EngineCore::EngineCore()
     : window("Alice Wild Adventure", 1920, 1080),
     tilemap()
 {
+    const std::filesystem::path assetsRoot = findAssetsRoot();
+    if (!assetsRoot.empty()) {
+        std::filesystem::current_path(assetsRoot.parent_path());
+    }
+    else {
+        std::cerr << "Warning: Could not locate Assets directory from "
+            << std::filesystem::current_path() << ".\n";
+    }
+
     camera = window.getRenderWindow().getDefaultView();
 
     if (!uiFont.loadFromFile("Assets/DejaVuSans.ttf")) {

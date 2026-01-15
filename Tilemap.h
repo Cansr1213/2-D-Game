@@ -112,6 +112,7 @@ public:
             powerupTextureLoaded = loadPowerupTexture("Assets/powerup.png", 1, 1);
 
         }
+        loadIndividualPowerups();
     }
 
     // TEMP level generator (safe)
@@ -533,11 +534,11 @@ public:
         static std::string getPowerupBasename(PowerupType type) {
             switch (type) {
             case PowerupType::SuperMushroom:
-                return "Magicmushroom";
+                return "Supermushroom";
             case PowerupType::FireFlower:
                 return "Fireflower";
             case PowerupType::SuperLeaf:
-                return "Superlead";
+                return "Superleaf";
             case PowerupType::TanookiSuit:
                 return "Tanookisuit";
             case PowerupType::HammerSuit:
