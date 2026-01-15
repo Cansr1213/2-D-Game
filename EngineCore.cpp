@@ -7,6 +7,7 @@
 #include "MovementComponent.h"
 #include "PhysicsComponent.h"
 #include "EnemyComponent.h"
+#include "ProjectileComponent.h"
 #include "Tilemap.h"
 #include "AnimationComponent.h"
 #include <iostream>
@@ -269,8 +270,10 @@ void EngineCore::loadLevel(int levelIndex) {
     collectedCoins = 0;
     playerDying = false;
     invincible = false;
-    invincibilityTimer = false;
+    invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;
+    attackCooldownTimer = 0.f;
+    flightTimer = 0.f;
     tilemap.resetCollectibles();
     tilemap.resetPowerups();
     reservePowerup.reset();
@@ -414,6 +417,8 @@ void EngineCore::update(float dt) {
     tilemap.update(dt);
 	updateInvincibility(dt);
     updatePowerupFlash(dt);
+    attackCooldownTimer = std::max(0.f, attackCooldownTimer - dt);
+
     if (playerDying) {
         scene.update(dt);
         updatePlayerDeath(dt);
@@ -425,9 +430,11 @@ void EngineCore::update(float dt) {
     resetPlayerIfFallen();
     handleCollectibles();
     handlePowerups();
+    handlePowerupActions(dt);
     checkGoalReached();
     scene.update(dt);
     applyGlidePhysics();
+    applyFlightPhysics(dt);
     clampPlayerToLevel();
     updateCameraFollow();
     clampCameraToLevel();
@@ -498,7 +505,7 @@ void EngineCore::render() {
         reserveText.setString("Reserve (Q): " + reserveLabel);
         window.getRenderWindow().draw(powerText);
         window.getRenderWindow().draw(reserveText);
-        controlsText.setString("Move: A/D Jump: Space Run: Shift Reserve: Q Reset: R Pause: P");
+        controlsText.setString("Move: A/D Jump/Fly: Space Run: Shift Throw: F Reserve: Q Reset: R Pause: P");
         window.getRenderWindow().draw(controlsText);
 
         if (gameOver) {
@@ -814,6 +821,24 @@ void EngineCore::handlePowerups() {
         score += powerupScoreValue;
     }
 }
+void EngineCore::handlePowerupActions(float dt) {
+    (void)dt;
+    if (!player || attackCooldownTimer > 0.f) {
+        return;
+    }
+    const bool attackPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::F);
+    if (!attackPressed) {
+        return;
+    }
+    if (currentPowerState == PlayerPowerState::FireFlower) {
+        spawnProjectile(false);
+        attackCooldownTimer = fireballCooldown;
+    }
+    else if (currentPowerState == PlayerPowerState::HammerSuit) {
+        spawnProjectile(true);
+        attackCooldownTimer = hammerCooldown;
+    }
+}
 
 
 void EngineCore::checkGoalReached() {
@@ -925,6 +950,9 @@ void EngineCore::handleEnemyCollisions() {
 
         }
         else {
+            if (invincible) {
+                continue;
+            }
             if (isPoweredState(currentPowerState)) {
                 setPlayerPowerState(PlayerPowerState::Small);
                 invincible = true;
@@ -947,6 +975,8 @@ void EngineCore::resetLevelState() {
     invincible = false;
     invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;
+    attackCooldownTimer = 0.f;
+    flightTimer = 0.f;
     tilemap.resetCollectibles();
     tilemap.resetPowerups();
     reservePowerup.reset();
@@ -1051,6 +1081,8 @@ void EngineCore::resetGameState() {
     invincible = false;
     invincibilityTimer = 0.f;
     powerupFlashTimer = 0.f;
+    attackCooldownTimer = 0.f;
+    flightTimer = 0.f;
     currentLevelIndex = 0;
     maxUnlockedLevelIndex = 0;
     selectedLevelIndex = 0;
@@ -1109,6 +1141,17 @@ void EngineCore::setPlayerPowerState(PlayerPowerState powerState) {
     }
     currentPowerState = powerState;
     applyPowerupMovementModifiers();
+    if (currentPowerState == PlayerPowerState::SuperLeaf
+        || currentPowerState == PlayerPowerState::TanookiSuit) {
+        flightTimer = flightDuration;
+    }
+    else {
+        flightTimer = 0.f;
+    }
+    if (currentPowerState == PlayerPowerState::TanookiSuit) {
+        invincible = true;
+        invincibilityTimer = tanookiInvincibilityDuration;
+    }
 
 }
 
@@ -1164,8 +1207,8 @@ void EngineCore::applyPowerupMovementModifiers() {
             movement->runSpeed = baseRunSpeed * 0.8f;
         }
         if (physics) {
-            physics->gravity = baseGravity * 0.75f;
-            physics->jumpStrength = baseJumpStrength * 1.05f;
+            physics->gravity = baseGravity * 0.7f;
+            physics->jumpStrength = baseJumpStrength * 1.45f;
         }
         break;
     case PlayerPowerState::HammerSuit:
@@ -1200,6 +1243,88 @@ void EngineCore::applyGlidePhysics() {
     }
     const float glideFallSpeed = 220.f;
     physics->velocityY = std::min(physics->velocityY, glideFallSpeed);
+}
+void EngineCore::applyFlightPhysics(float dt) {
+    if (!player) {
+        return;
+    }
+    if (currentPowerState != PlayerPowerState::SuperLeaf
+        && currentPowerState != PlayerPowerState::TanookiSuit) {
+        return;
+    }
+    PhysicsComponent* physics = player->getComponent<PhysicsComponent>();
+    if (!physics) {
+        return;
+    }
+    if (physics->onGround) {
+        flightTimer = flightDuration;
+        return;
+    }
+    if (flightTimer <= 0.f) {
+        return;
+    }
+    const bool flyHeld = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
+    if (!flyHeld) {
+        return;
+    }
+    flightTimer = std::max(0.f, flightTimer - dt);
+    physics->velocityY = std::min(physics->velocityY, flightBoostVelocity);
+}
+
+void EngineCore::spawnProjectile(bool isHammer) {
+    if (!player) {
+        return;
+    }
+    TransformComponent* transform = player->getComponent<TransformComponent>();
+    MovementComponent* movement = player->getComponent<MovementComponent>();
+    SpriteComponent* sprite = player->getComponent<SpriteComponent>();
+
+    if (!transform) {
+        return;
+    }
+
+    const float colliderWidth = movement ? movement->colliderWidth : 32.f;
+    const float colliderHeight = movement ? movement->colliderHeight : 48.f;
+    const float direction = (sprite && sprite->flipped) ? -1.f : 1.f;
+    const float spawnX = transform->position.x + (direction > 0.f ? colliderWidth : -projectileSize);
+    const float spawnY = transform->position.y + colliderHeight * 0.35f;
+
+    Entity* projectile = scene.createEntity();
+    TransformComponent* projectileTransform =
+        projectile->addComponent<TransformComponent>(spawnX, spawnY);
+
+    const std::string texturePath = isHammer
+        ? "Assets/powerups/Hammersuit.png"
+        : "Assets/powerups/Fireflower.png";
+    SpriteComponent* projectileSprite =
+        projectile->addComponent<SpriteComponent>(texturePath, projectileTransform);
+
+    if (const sf::Texture* texture = projectileSprite->getSprite().getTexture()) {
+        const sf::Vector2u size = texture->getSize();
+        if (size.x > 0 && size.y > 0) {
+            projectileSprite->frameWidth = static_cast<int>(size.x);
+            projectileSprite->frameHeight = static_cast<int>(size.y);
+            projectileSprite->getSprite().setOrigin(size.x / 2.f, size.y / 2.f);
+            const float scaleX = projectileSize / static_cast<float>(size.x);
+            const float scaleY = projectileSize / static_cast<float>(size.y);
+            projectileSprite->getSprite().setScale(direction < 0.f ? -scaleX : scaleX, scaleY);
+        }
+    }
+
+    const float speed = isHammer ? hammerSpeed : fireballSpeed;
+    const float initialVelocityY = isHammer ? -220.f : 0.f;
+    const float projectileGravity = isHammer ? hammerGravity : 0.f;
+
+    projectile->addComponent<ProjectileComponent>(
+        projectileTransform,
+        &tilemap,
+        &scene,
+        speed * direction,
+        initialVelocityY,
+        projectileSize,
+        projectileSize,
+        projectileLifetime,
+        projectileGravity);
 }
 
 EngineCore::PlayerPowerState EngineCore::toPlayerPowerState(Tilemap::PowerupType powerupType) {

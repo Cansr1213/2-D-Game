@@ -156,10 +156,24 @@ private:
     void applyPowerupPickup(Tilemap::PowerupType powerupType);
     void applyPowerupMovementModifiers();
     void applyGlidePhysics();
+    void applyFlightPhysics(float dt);
+    void handlePowerupActions(float dt);
+    void spawnProjectile(bool isHammer);
     static PlayerPowerState toPlayerPowerState(Tilemap::PowerupType powerupType);
     static std::string toPowerupLabel(PlayerPowerState powerState);
     static bool isPoweredState(PlayerPowerState powerState);
-
+    float attackCooldownTimer = 0.f;
+    const float fireballCooldown = 0.35f;
+    const float hammerCooldown = 0.5f;
+    const float fireballSpeed = 420.f;
+    const float hammerSpeed = 320.f;
+    const float hammerGravity = 1100.f;
+    const float projectileLifetime = 2.2f;
+    const float projectileSize = 18.f;
+    float flightTimer = 0.f;
+    const float flightDuration = 1.2f;
+    const float flightBoostVelocity = -260.f;
+    const float tanookiInvincibilityDuration = 4.f;
 
 
 };
