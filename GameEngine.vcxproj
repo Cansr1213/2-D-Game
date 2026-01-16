@@ -151,6 +151,7 @@
     <ClInclude Include="Input.h" />
     <ClInclude Include="MovementComponent.h" />
     <ClInclude Include="PhysicsComponent.h" />
+    <ClInclude Include="ProjectileComponent.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SpriteComponent.h" />

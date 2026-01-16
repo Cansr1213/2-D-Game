@@ -35,6 +35,39 @@ namespace {
         }
         return {};
     }
+
+    std::vector<std::string> getPlayerSpriteCandidates(EngineCore::PlayerPowerState powerState) {
+        switch (powerState) {
+        case EngineCore::PlayerPowerState::FireFlower:
+            return {
+                "Assets/powerups/PlayerFireflowerpowerup.png"
+            };
+        case EngineCore::PlayerPowerState::SuperLeaf:
+            return {
+                "Assets/PowerupAnim/FlyingAnim.png"
+                "Assets/powerups/PlayerSuperleafpowerup.png"
+            };
+        case EngineCore::PlayerPowerState::TanookiSuit:
+            return {
+                "Assets/powerups/PlayerTanookipowerup.png"
+            };
+        case EngineCore::PlayerPowerState::HammerSuit:
+            return {
+                  "Assets/PowerupAnim/HammerAnim.png"
+                "Assets/powerups/PlayerHammerpowerup.png"
+            };
+        case EngineCore::PlayerPowerState::FrogSuit:
+            return {
+                  "Assets/PowerupAnim/FrogAnim.png"
+                  "Assets/powerups/PlayerFrogpowerup.png"
+            };
+        case EngineCore::PlayerPowerState::SuperMushroom:
+        case EngineCore::PlayerPowerState::Small:
+        default:
+            return { "Assets/player.png" };
+        }
+
+    }
 }
 
 
@@ -1026,7 +1059,11 @@ void EngineCore::updatePowerupFlash(float dt) {
         const float t = powerupFlashTimer / std::max(powerupFlashDuration, 0.001f);
         const float pulse = 1.f + 0.1f * std::sin((1.f - t) * 12.f);
         const sf::Vector2f currentScale = sprite->getSprite().getScale();
-        const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
+        float textureScaleX = 1.f;
+        if (AnimationComponent* anim = player->getComponent<AnimationComponent>()) {
+            textureScaleX = anim->getTextureScaleX();
+        }
+        const float baseX = (currentScale.x < 0.f) ? -textureScaleX : textureScaleX;
         float baseY = isPoweredState(currentPowerState) ? 1.33f : 1.f;
         if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
             baseY = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
@@ -1041,7 +1078,11 @@ void EngineCore::updatePowerupFlash(float dt) {
         if (SpriteComponent* sprite = player->getComponent<SpriteComponent>()) {
             sprite->getSprite().setColor(sf::Color(255, 255, 255, 255));
             const sf::Vector2f currentScale = sprite->getSprite().getScale();
-            const float baseX = (currentScale.x < 0.f) ? -1.f : 1.f;
+            float textureScaleX = 1.f;
+            if (AnimationComponent* anim = player->getComponent<AnimationComponent>()) {
+                textureScaleX = anim->getTextureScaleX();
+            }
+            const float baseX = (currentScale.x < 0.f) ? -textureScaleX : textureScaleX;
             float baseY = isPoweredState(currentPowerState) ? 1.33f : 1.f;
             if (MovementComponent* movement = player->getComponent<MovementComponent>()) {
                 baseY = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
@@ -1102,6 +1143,7 @@ void EngineCore::setPlayerPowerState(PlayerPowerState powerState) {
     MovementComponent* movement = player->getComponent<MovementComponent>();
     PhysicsComponent* physics = player->getComponent<PhysicsComponent>();
     SpriteComponent* sprite = player->getComponent<SpriteComponent>();
+    AnimationComponent* animation = player->getComponent<AnimationComponent>();
 
     const float oldHeight = movement ? movement->colliderHeight : smallColliderHeight;
     const float powered = isPoweredState(powerState);
@@ -1123,19 +1165,46 @@ void EngineCore::setPlayerPowerState(PlayerPowerState powerState) {
     if (movement) {
         movement->colliderHeight = newHeight;
         movement->standingColliderHeight = baseHeight;
-        movement->setBaseScaleY(powered ? 1.33f : 1.f);
+        
 
     }
     if (physics) {
         physics->colliderHeight = newHeight;
 
     }
+    float textureScaleX = 1.f;
+    float textureScaleY = 1.f;
+
     if (sprite) {
-        const float xScale = sprite->getSprite().getScale().x;
-        float yScale = powered ? 1.33f : 1.f;
-        if (movement) {
-            yScale = movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f);
+        const std::vector<std::string> candidates = getPlayerSpriteCandidates(powerState);
+        bool updatedTexture = false;
+        for (const auto& path : candidates) {
+            if (sprite->setTexture(path)) {
+                updatedTexture = true;
+                if (animation) {
+                    animation->refreshFromTexture();
+                    textureScaleX = animation->getTextureScaleX();
+                    textureScaleY = animation->getTextureScaleY();
+                }
+                break;
+            }
         }
+        if (!updatedTexture && powerState != PlayerPowerState::Small) {
+            if (sprite->setTexture("Assets/player.png") && animation) {
+                animation->refreshFromTexture();
+                textureScaleX = animation->getTextureScaleX();
+                textureScaleY = animation->getTextureScaleY();
+            }
+        }
+        const float baseScaleY = (powered ? 1.33f : 1.f) * textureScaleY;
+        if (movement) {
+            movement->setBaseScaleY(baseScaleY);
+        }
+        const float yScale = movement
+            ? movement->baseScaleY * (movement->isCrouching ? movement->crouchScale : 1.f)
+            : baseScaleY;
+        const float xSign = (sprite->getSprite().getScale().x < 0.f) ? -1.f : 1.f;
+        const float xScale = xSign * textureScaleX;
         sprite->getSprite().setScale(xScale, yScale);
 
     }

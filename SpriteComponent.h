@@ -40,6 +40,14 @@ public:
     }
 
     sf::Sprite& getSprite() { return sprite; }
+    
+    bool setTexture(const std::string& textureFile) {
+        if (!texture.loadFromFile(textureFile)) {
+            std::cout << "FAILED TO LOAD SPRITE\n";
+        }
+        sprite.setTexture(texture, true);
+        return true;
+    }
 
     // ✅ Flip using scale ONLY
     void setFlipped(bool flip) {
