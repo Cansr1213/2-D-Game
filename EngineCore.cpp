@@ -39,6 +39,9 @@ namespace {
         if (spritePath.find("PowerupAnim") != std::string::npos) {
             return 6;
         }
+        if (spritePath.find("PowerupTansform") != std::string::npos) {
+            return 6;
+        }
         if (spritePath.find("Assets/player.png") != std::string::npos) {
             return 6;
         }

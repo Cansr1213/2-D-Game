@@ -118,6 +118,7 @@ public:
             frameHeight = baseFrameHeight;
 
             const auto size = tex->getSize();
+            int effectiveFrameCount = frameCount;
             if (frameCount > 0) {
                 frameWidth = static_cast<int>(size.x) / frameCount;
 
@@ -132,6 +133,21 @@ public:
                 }
 
             }
+            if (frameCount == 1) {
+                constexpr int assumedRows = 6;
+                const int candidateHeight = static_cast<int>(size.y) / assumedRows;
+                if (candidateHeight > 0) {
+                    frameWidth = static_cast<int>(size.x);
+                    frameHeight = candidateHeight;
+                    effectiveFrameCount = 1;
+                }
+            }
+            frameCount = std::max(1, effectiveFrameCount);
+            idleStart = 0;
+            idleEnd = std::max(0, frameCount - 1);
+            walkStart = 0;
+            walkEnd = idleEnd;
+
 
             idleRow = 0;
 
