@@ -35,31 +35,40 @@ namespace {
         }
         return {};
     }
+    int getPlayerFrameCountForSprite(const std::string& spritePath) {
+        if (spritePath.find("PowerupAnim") != std::string::npos) {
+            return 6;
+        }
+        if (spritePath.find("Assets/player.png") != std::string::npos) {
+            return 6;
+        }
+        return 1;
+    }
 
     std::vector<std::string> getPlayerSpriteCandidates(EngineCore::PlayerPowerState powerState) {
         switch (powerState) {
         case EngineCore::PlayerPowerState::FireFlower:
             return {
-                "Assets/powerups/PlayerFireflowerpowerup.png"
+                "Assets/PowerupTansform/PlayerFireflowerpowerup.png"
             };
         case EngineCore::PlayerPowerState::SuperLeaf:
             return {
-                "Assets/PowerupAnim/FlyingAnim.png"
-                "Assets/powerups/PlayerSuperleafpowerup.png"
+                "Assets/PowerupAnim/FlyingAnim.png",
+                "Assets/PowerupTansform/PlayerSuperleafpowerup.png"
             };
         case EngineCore::PlayerPowerState::TanookiSuit:
             return {
-                "Assets/powerups/PlayerTanookipowerup.png"
+                "Assets/PowerupTansform/PlayerTanookipowerup.png"
             };
         case EngineCore::PlayerPowerState::HammerSuit:
             return {
-                  "Assets/PowerupAnim/HammerAnim.png"
-                "Assets/powerups/PlayerHammerpowerup.png"
+                  "Assets/PowerupAnim/HammerAnim.png",
+                "Assets/PowerupTansform/PlayerHammerpowerup.png"
             };
         case EngineCore::PlayerPowerState::FrogSuit:
             return {
-                  "Assets/PowerupAnim/FrogAnim.png"
-                  "Assets/powerups/PlayerFrogpowerup.png"
+                  "Assets/PowerupAnim/FrogAnim.png",
+                  "Assets/PowerupTansform/PlayerFrogpowerup.png"
             };
         case EngineCore::PlayerPowerState::SuperMushroom:
         case EngineCore::PlayerPowerState::Small:
@@ -1182,7 +1191,7 @@ void EngineCore::setPlayerPowerState(PlayerPowerState powerState) {
             if (sprite->setTexture(path)) {
                 updatedTexture = true;
                 if (animation) {
-                    animation->refreshFromTexture();
+                    animation->setFrameCount(getPlayerFrameCountForSprite(path));
                     textureScaleX = animation->getTextureScaleX();
                     textureScaleY = animation->getTextureScaleY();
                 }
@@ -1191,7 +1200,7 @@ void EngineCore::setPlayerPowerState(PlayerPowerState powerState) {
         }
         if (!updatedTexture && powerState != PlayerPowerState::Small) {
             if (sprite->setTexture("Assets/player.png") && animation) {
-                animation->refreshFromTexture();
+                animation->setFrameCount(getPlayerFrameCountForSprite("Assets/player.png"));
                 textureScaleX = animation->getTextureScaleX();
                 textureScaleY = animation->getTextureScaleY();
             }

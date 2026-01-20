@@ -1,7 +1,7 @@
 #pragma once
 #include "Component.h"
 #include "SpriteComponent.h"
-
+#include <algorithm>
 enum class AnimState {
     Idle,
     Walk
@@ -61,6 +61,10 @@ public:
     void refreshFromTexture() {
         configureFromTexture(true);
    
+    }
+    void setFrameCount(int newFrameCount, bool resetState = true) {
+        frameCount = std::max(1, newFrameCount);
+        configureFromTexture(resetState);
     }
     float getTextureScaleX() const {
         return textureScaleX;
