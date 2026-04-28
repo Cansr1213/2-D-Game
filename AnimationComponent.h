@@ -128,6 +128,9 @@ public:
                     frameHeight = static_cast<int>(size.y) / columns;
 
                 }
+                else if (frameHeight <= 0 && frameWidth > 0 && size.y % frameWidth == 0) {
+                    frameHeight = frameWidth;
+                }
                 else if (frameHeight <= 0) {
                     frameHeight = static_cast<int>(size.y);
                 }

@@ -16,8 +16,10 @@
 #include <fstream>
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
+
 
 
 namespace {
@@ -40,7 +42,10 @@ namespace {
             return 6;
         }
         if (spritePath.find("PowerupTansform") != std::string::npos) {
-            return 6;
+            if (spritePath.find("PlayerFireflowerpowerup") != std::string::npos) {
+                return 1;
+            }
+            return 4;
         }
         if (spritePath.find("Assets/player.png") != std::string::npos) {
             return 6;
@@ -1383,11 +1388,13 @@ void EngineCore::spawnProjectile(bool isHammer) {
     if (const sf::Texture* texture = projectileSprite->getSprite().getTexture()) {
         const sf::Vector2u size = texture->getSize();
         if (size.x > 0 && size.y > 0) {
-            projectileSprite->frameWidth = static_cast<int>(size.x);
-            projectileSprite->frameHeight = static_cast<int>(size.y);
-            projectileSprite->getSprite().setOrigin(size.x / 2.f, size.y / 2.f);
-            const float scaleX = projectileSize / static_cast<float>(size.x);
-            const float scaleY = projectileSize / static_cast<float>(size.y);
+            const unsigned frameSize = std::min(size.x, size.y);
+            projectileSprite->frameWidth = static_cast<int>(frameSize);
+            projectileSprite->frameHeight = static_cast<int>(frameSize);
+            projectileSprite->getSprite().setTextureRect(sf::IntRect(0, 0, static_cast<int>(frameSize), static_cast<int>(frameSize)));
+            projectileSprite->getSprite().setOrigin(frameSize / 2.f, frameSize / 2.f);
+            const float scaleX = projectileSize / static_cast<float>(frameSize);
+            const float scaleY = projectileSize / static_cast<float>(frameSize);
             projectileSprite->getSprite().setScale(direction < 0.f ? -scaleX : scaleX, scaleY);
         }
     }

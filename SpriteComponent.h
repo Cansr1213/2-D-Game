@@ -43,7 +43,9 @@ public:
     
     bool setTexture(const std::string& textureFile) {
         if (!texture.loadFromFile(textureFile)) {
-            std::cout << "FAILED TO LOAD SPRITE\n";
+            std::cout << "FAILED TO LOAD SPRITE: " << textureFile << "\n";
+            return false;
+
         }
         sprite.setTexture(texture, true);
         return true;
