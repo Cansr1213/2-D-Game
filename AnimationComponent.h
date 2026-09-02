@@ -156,6 +156,7 @@ public:
             if (frameHeight > 0 && desiredFrameHeight > 0) {
                 textureScaleY = static_cast<float>(desiredFrameHeight) / static_cast<float>(frameHeight);
             }
+            spriteComp->setRenderSize(desiredFrameWidth, desiredFrameHeight);
             idleStart = 0;
             idleEnd = std::max(0, frameCount - 1);
             walkStart = 0;

@@ -4,11 +4,14 @@
 #include <SFML/Graphics.hpp>
 #include <string>
 #include <iostream>
+#include <algorithm>
 
 class SpriteComponent : public Component {
 public:
     int frameWidth = 32;
     int frameHeight = 32;
+    int renderWidth = 32;
+    int renderHeight = 32;
     bool flipped = false;
     bool visible = true;
 
@@ -30,8 +33,8 @@ public:
     void update(float dt) override {
         // ✅ Keep physics + rendering aligned
         sprite.setPosition(
-            transform->position.x + frameWidth / 2.5f,
-            transform->position.y + frameHeight / 2.5f);
+            transform->position.x + renderWidth / 2.f,
+            transform->position.y + renderHeight / 2.f);
     }
 
     void render(sf::RenderTarget& target) override {
@@ -62,6 +65,11 @@ public:
     }
     void setVisible(bool isVisible) {
         visible = isVisible;
+    }
+
+    void setRenderSize(int width, int height) {
+        renderWidth = std::max(1, width);
+        renderHeight = std::max(1, height);
     }
 
 private:
