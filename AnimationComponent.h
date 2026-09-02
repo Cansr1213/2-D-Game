@@ -116,6 +116,8 @@ public:
             }
             frameWidth = baseFrameWidth;
             frameHeight = baseFrameHeight;
+            textureScaleX = 1.f;
+            textureScaleY = 1.f;
 
             const auto size = tex->getSize();
             int effectiveFrameCount = frameCount;
@@ -137,15 +139,23 @@ public:
 
             }
             if (frameCount == 1) {
-                constexpr int assumedRows = 6;
-                const int candidateHeight = static_cast<int>(size.y) / assumedRows;
-                if (candidateHeight > 0) {
-                    frameWidth = static_cast<int>(size.x);
-                    frameHeight = candidateHeight;
-                    effectiveFrameCount = 1;
-                }
+                frameWidth = std::max(1, static_cast<int>(size.x));
+                frameHeight = std::max(1, static_cast<int>(size.y));
+                effectiveFrameCount = 1;
             }
             frameCount = std::max(1, effectiveFrameCount);
+            if (desiredFrameWidth <= 0) {
+                desiredFrameWidth = frameWidth;
+            }
+            if (desiredFrameHeight <= 0) {
+                desiredFrameHeight = frameHeight;
+            }
+            if (frameWidth > 0 && desiredFrameWidth > 0) {
+                textureScaleX = static_cast<float>(desiredFrameWidth) / static_cast<float>(frameWidth);
+            }
+            if (frameHeight > 0 && desiredFrameHeight > 0) {
+                textureScaleY = static_cast<float>(desiredFrameHeight) / static_cast<float>(frameHeight);
+            }
             idleStart = 0;
             idleEnd = std::max(0, frameCount - 1);
             walkStart = 0;

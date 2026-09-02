@@ -42,10 +42,7 @@ namespace {
             return 6;
         }
         if (spritePath.find("PowerupTansform") != std::string::npos) {
-            if (spritePath.find("PlayerFireflowerpowerup") != std::string::npos) {
-                return 8;
-            }
-            return 4;
+            return 1;
         }
         if (spritePath.find("Assets/player.png") != std::string::npos) {
             return 6;
